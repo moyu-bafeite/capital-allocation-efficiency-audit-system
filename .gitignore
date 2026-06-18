@@ -1,0 +1,63 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.python-version
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Dependency and build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Test, coverage, and type-check caches
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.pyre/
+
+# Streamlit local state and secrets
+.streamlit/secrets.toml
+.streamlit/config.toml
+streamlit.log
+
+# Environment variables and local secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+
+# Local audit data, uploads, and generated exports
+# Keep committed demo/reference data such as data/tencent_demo.json.
+data/private/
+data/raw/
+data/uploads/
+exports/
+reports/
+outputs/
+*.xlsx
+*.xls
+*.csv
+
+# Notebook and interactive session artifacts
+.ipynb_checkpoints/
+
+# IDE, editor, and OS files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
