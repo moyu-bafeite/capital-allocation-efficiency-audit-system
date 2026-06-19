@@ -142,7 +142,7 @@ maint_capex_ratio = st.sidebar.slider(
     max_value=1.00,
     value=0.50,
     step=0.05,
-    help="巴菲特定义‘所有者盈余’时需扣除维持目前业务所需资本开支(Maintenance CapEx)。财报中一般未披露，50%为保守默认估算值。"
+    help="巴菲特定义“所有者盈余”时需扣除维持目前业务所需资本开支 (Maintenance CapEx)。财报中一般未披露，50% 为保守默认估算值。"
 )
 
 st.sidebar.subheader("2. ROIIC 滚动窗口与滞后参数")
@@ -188,7 +188,7 @@ wacc = st.sidebar.slider(
 )
 
 growth_s1 = st.sidebar.slider(
-    "第一阶段增长率 (前5年)",
+    "第一阶段增长率（前 5 年）",
     min_value=-0.10,
     max_value=0.30,
     value=0.08,
@@ -197,7 +197,7 @@ growth_s1 = st.sidebar.slider(
 )
 
 growth_s2 = st.sidebar.slider(
-    "第二阶段增长率 (后5年)",
+    "第二阶段增长率（后 5 年）",
     min_value=-0.10,
     max_value=0.20,
     value=0.04,
@@ -585,11 +585,11 @@ elif selected_section == "🏆 资本配置能力综合量化评分 (Capital All
         st.markdown("-----")
         
         st.markdown("###### 📐 五维权重分值细目")
-        st.markdown(f"- 存量资产创利 (30%): **{scorecard['roic_score']:.0f}**")
-        st.markdown(f"- 增量利润开拓 (25%): **{scorecard['roiic_score']:.0f}**")
-        st.markdown(f"- 市场市值创造 (20%): **{scorecard['one_dollar_score']:.0f}**")
-        st.markdown(f"- 回购折折溢价 (15%): **{scorecard['buyback_score']:.0f}**")
-        st.markdown(f"- 分红及再投资适配 (10%): **{scorecard['payout_score']:.0f}**")
+        st.markdown(f"- 存量资产创利 (30%)：**{scorecard['roic_score']:.0f}**")
+        st.markdown(f"- 增量利润开拓 (25%)：**{scorecard['roiic_score']:.0f}**")
+        st.markdown(f"- 市场市值创造 (20%)：**{scorecard['one_dollar_score']:.0f}**")
+        st.markdown(f"- 回购折价溢价 (10%)：**{scorecard['buyback_score']:.0f}**")
+        st.markdown(f"- 现金回报适配 (15%)：**{scorecard['payout_score']:.0f}**")
 
     with col_score2:
         st.markdown(commentary)
