@@ -86,16 +86,16 @@ st.sidebar.header("📁 数据源选择 & 载入")
 # Choose data source
 data_source_opt = st.sidebar.selectbox(
     "选择审计标的",
-    ["腾讯控股 (0700.HK) - 过去10年标杆Demo", "上传自定义 JSON 数据文件"]
+    ["腾讯控股 (00700.HK)", "上传自定义 JSON 数据文件"]
 )
 
 raw_data = None
 
-if data_source_opt == "腾讯控股 (0700.HK) - 过去10年标杆Demo":
+if data_source_opt == "腾讯控股 (00700.HK)":
     try:
         with open("data/tencent_demo.json", "r", encoding="utf-8") as f:
             raw_data = json.load(f)
-        st.sidebar.success("成功载入腾讯控股历史财报数据。")
+        st.sidebar.success("成功载入【腾讯控股 (0700.HK)】历史财报数据。")
     except Exception as e:
         st.sidebar.error(f"Demo 数据载入失败: {e}")
 else:
@@ -107,7 +107,7 @@ else:
         except Exception as e:
             st.sidebar.error(f"解析 JSON 失败: {e}")
     else:
-        st.sidebar.info("请在上方拖入您的 JSON 财报文件。")
+        st.sidebar.info("请在上方拖入 JSON 财报文件。")
 
 # Proactive feature: Download Template link in Sidebar
 st.sidebar.markdown("---")
