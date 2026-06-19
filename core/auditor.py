@@ -92,7 +92,7 @@ class ManagementAuditor:
             (self.df["Buyback_to_Intrinsic_Ratio"] > 0.85) & (self.df["Buyback_to_Intrinsic_Ratio"] <= 1.10),
             self.df["Buyback_to_Intrinsic_Ratio"] > 1.10
         ]
-        choices = ["无显著回购", "卓越回购 (低吸/创造价值)", "合理回购 (公允对价)", "盲目回购 (高位抬轿/摧毁价值)"]
+        choices = ["无显著回购", "卓越回购（低吸 / 创造价值）", "合理回购（公允对价）", "盲目回购（高位抬轿 / 摧毁价值）"]
         
         self.df["Buyback_Audit_Rating"] = np.select(conditions, choices, default="无显著回购")
         return self.df
@@ -116,13 +116,13 @@ class ManagementAuditor:
             roic_score = 90.0
         elif avg_roic >= 0.10:
             roic_score = 75.0
-        elif avg_roic >= 0.06:
+        elif avg_roic >= 0.05:
             roic_score = 60.0
         else:
             roic_score = 40.0
 
         # 2. ROIIC Score (25% weight)
-        # We look at the most recent 5-year rolling ROIIC (or latest non-nan available)
+        # We look at the most recent 5-year rolling ROIIC Retained (or latest non-nan available)
         roiic_cols = [c for c in self.df.columns if c.startswith("ROIIC_Retained_")]
         if roiic_cols:
             latest_roiic = self.df[roiic_cols[0]].dropna().iloc[-1] if not self.df[roiic_cols[0]].dropna().empty else np.nan
@@ -131,16 +131,16 @@ class ManagementAuditor:
             
         if pd.isna(latest_roiic):
             roiic_score = 75.0
-        elif latest_roiic >= 0.18:
+        elif latest_roiic >= 0.20:
             roiic_score = 100.0
-        elif latest_roiic >= 0.12:
+        elif latest_roiic >= 0.15:
             roiic_score = 90.0
-        elif latest_roiic >= 0.08:
+        elif latest_roiic >= 0.10:
             roiic_score = 75.0
-        elif latest_roiic >= 0.04:
+        elif latest_roiic >= 0.05:
             roiic_score = 60.0
         else:
-            roiic_score = 35.0
+            roiic_score = 40.0
 
         # 3. One-Dollar Rule Score (20% weight)
         one_dollar_cols = [c for c in self.df.columns if c.startswith("One_Dollar_Rule_")]
@@ -154,13 +154,13 @@ class ManagementAuditor:
         elif latest_one_dollar >= 1.5:
             one_dollar_score = 100.0
         elif latest_one_dollar >= 1.0:
-            one_dollar_score = 85.0
+            one_dollar_score = 80.0
         elif latest_one_dollar >= 0.5:
             one_dollar_score = 60.0
         else:
             one_dollar_score = 30.0
 
-        # 4. Buyback Timing Score (15% weight)
+        # 4. Buyback Timing Score (10% weight)
         # Look at average Buyback-to-Intrinsic ratio for years with buybacks
         buyback_ratios = self.df["Buyback_to_Intrinsic_Ratio"].dropna()
         if buyback_ratios.empty:
@@ -180,23 +180,25 @@ class ManagementAuditor:
             else:
                 buyback_score = 30.0
 
-        # 5. Shareholder Payout Appropriateness Score (10% weight)
+        # 5. Shareholder Payout Appropriateness Score (15% weight)
         # If ROIC is low (<8%), they should pay out dividends/buybacks. If ROIC is high, retention is welcomed.
-        # Let's assess: payout_ratio = (dividends + buybacks) / net_profit
+        # payout_ratio = (dividends + buybacks) / net_profit
         total_profit = self.df["net_profit"].sum()
         total_payout = self.df["dividends_paid"].sum() + self.df["buybacks_paid"].sum()
         payout_ratio = total_payout / total_profit if total_profit > 0 else 0.0
         
         if avg_roic < 0.08:
             # Low return, should return cash
-            if payout_ratio >= 0.60:
+            if payout_ratio >= 0.75:
                 payout_score = 100.0
-            elif payout_ratio >= 0.40:
+            elif payout_ratio >= 0.60:
                 payout_score = 80.0
-            elif payout_ratio >= 0.20:
+            elif payout_ratio >= 0.40:
                 payout_score = 60.0
+            elif payout_ratio >= 0.20:
+                payout_score = 40.0
             else:
-                payout_score = 30.0
+                payout_score = 20.0
         else:
             # High return, retention is okay, but some payout is healthy
             if payout_ratio >= 0.30:
@@ -209,20 +211,20 @@ class ManagementAuditor:
             roic_score * 0.30 +
             roiic_score * 0.25 +
             one_dollar_score * 0.20 +
-            buyback_score * 0.15 +
-            payout_score * 0.10
+            buyback_score * 0.10 +
+            payout_score * 0.15
         )
 
         # Assign letter grade
-        if composite_score >= 93:
+        if composite_score >= 95:
             grade = "A+"
-        elif composite_score >= 88:
+        elif composite_score >= 90:
             grade = "A"
-        elif composite_score >= 82:
+        elif composite_score >= 80:
             grade = "B"
-        elif composite_score >= 75:
+        elif composite_score >= 70:
             grade = "C"
-        elif composite_score >= 65:
+        elif composite_score >= 60:
             grade = "D"
         else:
             grade = "F"
@@ -243,7 +245,7 @@ class ManagementAuditor:
 
     def generate_commentary(self, score_dict: Dict[str, Any]) -> str:
         """
-        Generates a rich, highly targeted qualitative analysis report in Chinese based on Warren Buffett's philosophy.
+        Generates a rich, highly targeted qualitative analysis report based on Warren Buffett's philosophy.
         """
         grade = score_dict["grade"]
         avg_roic_pct = f"{score_dict['avg_roic']*100:.1f}%" if not pd.isna(score_dict["avg_roic"]) else "N/A"
@@ -255,9 +257,9 @@ class ManagementAuditor:
         commentary.append(f"##### 🎯 审计成绩单：**{grade}** (综合分：{score_dict['composite_score']}/100)")
         commentary.append(f"**核心财务特征概览**：")
         commentary.append(f"- 历史平均投入资本回报率 (ROIC)：**{avg_roic_pct}**")
-        commentary.append(f"- 最新 5 年累计留存盈余再投资回报率 (ROIIC)：**{latest_roiic_pct}**")
+        commentary.append(f"- 最近 5 年累计留存盈余再投资回报率 (ROIIC)：**{latest_roiic_pct}**")
         commentary.append(f"- 最近 5 年“一美元原则”系数：**{latest_1d}**")
-        commentary.append(f"- 累计净利润用于“股东分红 / 回购”比例 (Payout Ratio)：**{payout_pct}**\n")
+        commentary.append(f"- 累计净利润用于“分红 / 回购”比例 (Payout Ratio)：**{payout_pct}**\n")
 
         # Analyze ROIC
         commentary.append("###### 1. 存量资产创利能力 (ROIC)")
@@ -271,15 +273,15 @@ class ManagementAuditor:
         # Analyze ROIIC & Reinvestment
         commentary.append("###### 2. 增量资本利用效率 (ROIIC)")
         if score_dict["roiic_score"] >= 90:
-            commentary.append(f"最新一期 ROIIC 高达 {latest_roiic_pct}，极其优秀！这说明管理层不仅守业成功，创业开拓也极其高效。他们把留存下来的每一分盈余都投在了极高回报的新项目上，未发生“资本帝国的盲目扩张 (Diworsification)”，展现了大师级的资本配置水准。")
+            commentary.append(f"最近 5 年 ROIIC 高达 {latest_roiic_pct}，极其优秀！这说明管理层不仅守业成功，创业开拓也极其高效。他们把留存下来的每一分盈余都投在了极高回报的新项目上，未发生“资本帝国的盲目扩张 (Diworsification)”，展现了大师级的资本配置水准。")
         elif score_dict["roiic_score"] >= 75:
-            commentary.append(f"增量回报率 ROIIC 为 {latest_roiic_pct}，表现合格。公司能将留存利润有效地部署在生产性资产中，并产生不错的新增利润。然而，这与存量 ROIC 相比存在一定差值，可能预示着随着企业规模变大，高回报的投资机会正在逐步减少。")
+            commentary.append(f"最近 5 年 ROIIC 为 {latest_roiic_pct}，表现合格。公司能将留存利润有效地部署在生产性资产中，并产生不错的新增利润。然而，这与存量 ROIC 相比存在一定差值，可能预示着随着企业规模变大，高回报的投资机会正在逐步减少。")
         else:
             commentary.append(f"增量再投资回报率 ROIIC 仅为 {latest_roiic_pct}，形势严峻。这代表公司面临典型的“规模陷阱”——存量业务虽然赚钱，但新增投资却是在低回报甚至亏损的项目中“打水漂”。管理层应当立即减少资本支出，将利润全额分红或用于回购，而不是盲目留存。")
 
         # Analyze One-Dollar Rule
         commentary.append("###### 3. 市场价值创造（一美元原则）")
-        if score_dict["one_dollar_score"] >= 85:
+        if score_dict["one_dollar_score"] >= 80:
             commentary.append(f"一美元原则系数为 {latest_1d}（大于 1.0）。说明在资本市场上，管理层留存的每一元留存盈余，都已经成功转化为了超过一元的市场价值增量。这代表市场对管理层长期留存资金的决策投下了强烈的“信任票”。")
         else:
             commentary.append(f"一美元原则系数为 {latest_1d}（小于 1.0）。这是一个经典的危险信号！在过去 5 年里，管理层截留了大量本应属于股东的现金，但公司的市值增长却远落后于留存资金的规模。管理层面临资本配置失效，市值管理能力不足，或者留存项目不被市场认可。")
@@ -294,9 +296,9 @@ class ManagementAuditor:
             blind_buybacks = buyback_years[buyback_years["Buyback_Audit_Rating"].str.contains("盲目")]
             
             if not excellent_buybacks.empty and blind_buybacks.empty:
-                commentary.append("管理层在回购决策上表现出了**极高智慧**。主要回购均发生在股价低于每股保守内在价值时（即安全边际充足的“黄金买点”），这种低位注销股份的行为实实在在地增厚了长期持有者的“所有者权益”。")
+                commentary.append("管理层在回购决策上表现出了极高智慧。主要回购均发生在股价低于每股保守内在价值时（即安全边际充足的“黄金买点”），这种低位注销股份的行为实实在在地增厚了长期持有者的“所有者权益”。")
             elif not blind_buybacks.empty and excellent_buybacks.empty:
-                commentary.append("警告：管理层的回购存在明显的“高位接盘”、“市值操纵”嫌疑。他们在股价高企、远超内在价值的泡沫时期执行了大笔回购，这其实是在用真金白银补贴离场股东，却极大地损害了长期留守股东的利益，属于反向资本配置决策。")
+                commentary.append("警告：管理层的回购存在明显的“高位接盘”、“市值操纵”等嫌疑。他们在股价高企、远超内在价值的泡沫时期执行了大笔回购，这其实是在用真金白银补贴离场股东，却极大地损害了长期留守股东的利益，属于反向资本配置决策。")
             elif not excellent_buybacks.empty and not blind_buybacks.empty:
                 commentary.append("管理层的回购动作毁誉参半。既有在行业周期底部、股价低估时的果断出手，也存在在牛市高峰、高估值时为了迎合市场而进行的高位回购。资本配置的纪律性仍有提升空间。")
             else:
@@ -305,7 +307,7 @@ class ManagementAuditor:
         # Final advice
         commentary.append("##### ⚖️ 审计结论与投资建议")
         if grade in ["A+", "A"]:
-            commentary.append("👉 **投资评级：极高推荐度 (High Conviction Buy - From Allocation Perspective)**\n\n该公司拥有极其罕见的“超级护城河”，同时管理层展现了巴菲特级别的资本配置艺术：**高 ROIC、高 ROIIC、回购精准、市场认可。** 对于这样的公司，估值合理时应坚决重仓买入，并长期持有，让时间与管理层一起为您复利滚雪球。")
+            commentary.append("👉 **投资评级：极高推荐度 (High Conviction Buy - From Allocation Perspective)**\n\n该公司拥有极其罕见的“超级护城河”，同时管理层展现了巴菲特级别的资本配置艺术：**高 ROIC、高 ROIIC、回购精准、市场认可。**对于这样的公司，估值合理时应坚决重仓买入，并长期持有，让时间与管理层复利滚雪球。")
         elif grade in ["B"]:
             commentary.append("👉 **投资评级：持有 / 逢低买入 (Strong Hold)**\n\n该公司属于优秀的“价值创造者”。管理层资本配置能力及格偏上。虽然随着规模变大增量效率稍显平庸，但护城河基本盘依然稳固。建议结合当前股价的安全边际（PB/PE/DCF 折扣）进行定投或分批买入。")
         elif grade in ["C"]:
