@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from typing import Dict, Any, List
+from typing import Dict, Any
 
 class ManagementAuditor:
     def __init__(self, df: pd.DataFrame):
@@ -122,11 +122,21 @@ class ManagementAuditor:
             roic_score = 40.0
 
         # 2. ROIIC Score (25% weight)
-        # We look at the most recent 5-year rolling ROIIC Retained (or latest non-nan available)
+        # Use the longest configured ROIIC Retained window instead of relying on column order.
         roiic_cols = [c for c in self.df.columns if c.startswith("ROIIC_Retained_")]
-        if roiic_cols:
-            latest_roiic = self.df[roiic_cols[0]].dropna().iloc[-1] if not self.df[roiic_cols[0]].dropna().empty else np.nan
+        roiic_windows = []
+        for col in roiic_cols:
+            window_text = col.replace("ROIIC_Retained_", "", 1).removesuffix("Y")
+            if window_text.isdigit():
+                roiic_windows.append((int(window_text), col))
+
+        if roiic_windows:
+            roiic_window, roiic_col = max(roiic_windows, key=lambda item: item[0])
+            roiic_values = self.df[roiic_col].dropna()
+            latest_roiic = roiic_values.iloc[-1] if not roiic_values.empty else np.nan
         else:
+            roiic_window = None
+            roiic_col = None
             latest_roiic = np.nan
             
         if pd.isna(latest_roiic):
@@ -161,14 +171,19 @@ class ManagementAuditor:
             one_dollar_score = 30.0
 
         # 4. Buyback Timing Score (10% weight)
-        # Look at average Buyback-to-Intrinsic ratio for years with buybacks
+        # Weight buyback quality by actual cash spent, so large repurchases matter more.
         buyback_ratios = self.df["Buyback_to_Intrinsic_Ratio"].dropna()
         if buyback_ratios.empty:
             # No buybacks. Were they paying dividends?
             # If they didn't do buybacks, but paid generous dividends (or had high ROIC to reinvest), they shouldn't be penalized heavily.
             buyback_score = 80.0  # Neutral
+            avg_buyback_ratio = np.nan
         else:
-            avg_buyback_ratio = buyback_ratios.mean()
+            buyback_weights = self.df.loc[buyback_ratios.index, "buybacks_paid"].clip(lower=0)
+            if buyback_weights.sum() > 0:
+                avg_buyback_ratio = np.average(buyback_ratios, weights=buyback_weights)
+            else:
+                avg_buyback_ratio = buyback_ratios.mean()
             if avg_buyback_ratio <= 0.80:
                 buyback_score = 100.0
             elif avg_buyback_ratio <= 1.00:
@@ -182,10 +197,12 @@ class ManagementAuditor:
 
         # 5. Shareholder Payout Appropriateness Score (15% weight)
         # If ROIC is low (<8%), they should pay out dividends/buybacks. If ROIC is high, retention is welcomed.
-        # payout_ratio = (dividends + buybacks) / net_profit
-        total_profit = self.df["net_profit"].sum()
+        # Use Owner Earnings / FCF coverage to avoid rewarding debt-funded distributions.
         total_payout = self.df["dividends_paid"].sum() + self.df["buybacks_paid"].sum()
-        payout_ratio = total_payout / total_profit if total_profit > 0 else 0.0
+        total_owner_earnings = self.df["Owner_Earnings"].sum() if "Owner_Earnings" in self.df.columns else self.df["net_profit"].sum()
+        total_fcf = (self.df["operating_cash_flow"] - self.df["capex"]).sum()
+        payout_ratio = total_payout / total_owner_earnings if total_owner_earnings > 0 else 0.0
+        fcf_payout_ratio = total_payout / total_fcf if total_fcf > 0 else np.nan
         
         if avg_roic < 0.08:
             # Low return, should return cash
@@ -205,6 +222,16 @@ class ManagementAuditor:
                 payout_score = 100.0
             else:
                 payout_score = 85.0
+
+        if total_payout > 0:
+            if total_owner_earnings <= 0:
+                payout_score = min(payout_score, 40.0)
+            elif pd.isna(fcf_payout_ratio):
+                payout_score = min(payout_score, 55.0)
+            elif fcf_payout_ratio > 1.25:
+                payout_score = min(payout_score, 55.0)
+            elif fcf_payout_ratio > 1.0:
+                payout_score = min(payout_score, 70.0)
 
         # Calculate weighted composite score
         composite_score = (
@@ -239,8 +266,12 @@ class ManagementAuditor:
             "payout_score": payout_score,
             "avg_roic": avg_roic,
             "latest_roiic": latest_roiic,
+            "roiic_window": roiic_window,
+            "roiic_col": roiic_col,
             "latest_one_dollar": latest_one_dollar,
-            "payout_ratio": payout_ratio
+            "payout_ratio": payout_ratio,
+            "fcf_payout_ratio": fcf_payout_ratio,
+            "avg_buyback_ratio": avg_buyback_ratio
         }
 
     def generate_commentary(self, score_dict: Dict[str, Any]) -> str:
@@ -252,14 +283,17 @@ class ManagementAuditor:
         latest_roiic_pct = f"{score_dict['latest_roiic']*100:.1f}%" if not pd.isna(score_dict["latest_roiic"]) else "N/A"
         latest_1d = f"{score_dict['latest_one_dollar']:.2f}" if not pd.isna(score_dict["latest_one_dollar"]) else "N/A"
         payout_pct = f"{score_dict['payout_ratio']*100:.1f}%"
+        fcf_payout_pct = f"{score_dict['fcf_payout_ratio']*100:.1f}%" if not pd.isna(score_dict["fcf_payout_ratio"]) else "N/A"
+        roiic_period = f"最近 {score_dict['roiic_window']} 年" if score_dict.get("roiic_window") else "最近可用窗口"
 
         commentary = []
         commentary.append(f"##### 🎯 审计成绩单：**{grade}** (综合分：{score_dict['composite_score']}/100)")
         commentary.append(f"**核心财务特征概览**：")
         commentary.append(f"- 历史平均投入资本回报率 (ROIC)：**{avg_roic_pct}**")
-        commentary.append(f"- 最近 5 年累计留存盈余再投资回报率 (ROIIC)：**{latest_roiic_pct}**")
+        commentary.append(f"- {roiic_period}累计留存盈余再投资回报率 (ROIIC)：**{latest_roiic_pct}**")
         commentary.append(f"- 最近 5 年“一美元原则”系数：**{latest_1d}**")
-        commentary.append(f"- 累计净利润用于“分红 / 回购”比例 (Payout Ratio)：**{payout_pct}**\n")
+        commentary.append(f"- 累计所有者盈余用于“分红 / 回购”比例 (Payout Ratio)：**{payout_pct}**")
+        commentary.append(f"- 累计自由现金流用于“分红 / 回购”比例 (FCF Payout Ratio)：**{fcf_payout_pct}**\n")
 
         # Analyze ROIC
         commentary.append("###### 1. 存量资产创利能力 (ROIC)")
@@ -273,9 +307,9 @@ class ManagementAuditor:
         # Analyze ROIIC & Reinvestment
         commentary.append("###### 2. 增量资本利用效率 (ROIIC)")
         if score_dict["roiic_score"] >= 90:
-            commentary.append(f"最近 5 年 ROIIC 高达 {latest_roiic_pct}，极其优秀！这说明管理层不仅守业成功，创业开拓也极其高效。他们把留存下来的每一分盈余都投在了极高回报的新项目上，未发生“资本帝国的盲目扩张 (Diworsification)”，展现了大师级的资本配置水准。")
+            commentary.append(f"{roiic_period} ROIIC 高达 {latest_roiic_pct}，极其优秀！这说明管理层不仅守业成功，创业开拓也极其高效。他们把留存下来的每一分盈余都投在了极高回报的新项目上，未发生“资本帝国的盲目扩张 (Diworsification)”，展现了大师级的资本配置水准。")
         elif score_dict["roiic_score"] >= 75:
-            commentary.append(f"最近 5 年 ROIIC 为 {latest_roiic_pct}，表现合格。公司能将留存利润有效地部署在生产性资产中，并产生不错的新增利润。然而，这与存量 ROIC 相比存在一定差值，可能预示着随着企业规模变大，高回报的投资机会正在逐步减少。")
+            commentary.append(f"{roiic_period} ROIIC 为 {latest_roiic_pct}，表现合格。公司能将留存利润有效地部署在生产性资产中，并产生不错的新增利润。然而，这与存量 ROIC 相比存在一定差值，可能预示着随着企业规模变大，高回报的投资机会正在逐步减少。")
         else:
             commentary.append(f"增量再投资回报率 ROIIC 仅为 {latest_roiic_pct}，形势严峻。这代表公司面临典型的“规模陷阱”——存量业务虽然赚钱，但新增投资却是在低回报甚至亏损的项目中“打水漂”。管理层应当立即减少资本支出，将利润全额分红或用于回购，而不是盲目留存。")
 
