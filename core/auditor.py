@@ -252,40 +252,40 @@ class ManagementAuditor:
         payout_pct = f"{score_dict['payout_ratio']*100:.1f}%"
 
         commentary = []
-        commentary.append(f"### 🎯 巴菲特审计成绩单：**{grade}** (综合得分: {score_dict['composite_score']}/100)")
+        commentary.append(f"##### 🎯 审计成绩单：**{grade}** (综合分：{score_dict['composite_score']}/100)")
         commentary.append(f"**核心财务特征概览**：")
-        commentary.append(f"- 历史平均投入资本回报率 (ROIC): **{avg_roic_pct}**")
-        commentary.append(f"- 最新5年累计留存盈余再投资回报率 (ROIIC): **{latest_roiic_pct}**")
-        commentary.append(f"- 最近5年“一美元原则”系数: **{latest_1d}**")
-        commentary.append(f"- 累计净利润用于股东分红/回购比例 (Payout Ratio): **{payout_pct}**\n")
+        commentary.append(f"- 历史平均投入资本回报率 (ROIC)：**{avg_roic_pct}**")
+        commentary.append(f"- 最新 5 年累计留存盈余再投资回报率 (ROIIC)：**{latest_roiic_pct}**")
+        commentary.append(f"- 最近 5 年“一美元原则”系数：**{latest_1d}**")
+        commentary.append(f"- 累计净利润用于“股东分红 / 回购”比例 (Payout Ratio)：**{payout_pct}**\n")
 
         # Analyze ROIC
-        commentary.append("#### 1. 存量资产创利能力 (ROIC 审计)")
+        commentary.append("###### 1. 存量资产创利能力 (ROIC)")
         if score_dict["roic_score"] >= 90:
-            commentary.append(f"该公司的平均 ROIC 高达 {avg_roic_pct}，属于巴菲特极其钟爱的**“高经济护城河(Moat)”**企业。公司即使在存量竞争或宏观环境波动下，依然能够凭借极强的议价权、品牌或网络效应维持超高水平的回报率。管理层护城河守护得当，资产质量极佳。")
+            commentary.append(f"该公司的平均 ROIC 高达 {avg_roic_pct}，属于巴菲特极其钟爱的“高经济护城河”企业。公司即使在存量竞争或宏观环境波动下，依然能够凭借极强的议价权、品牌或网络效应维持超高水平的回报率。管理层护城河守护得当，资产质量极佳。")
         elif score_dict["roic_score"] >= 75:
             commentary.append(f"该公司的平均 ROIC 处于中上水平 ({avg_roic_pct})。表明企业具备一定的竞争壁垒，能够产生超越资本成本的超额回报，但在行业激烈竞争或逆周期时，护城河可能受到部分侵蚀，需关注其稳定性。")
         else:
-            commentary.append(f"该公司的平均 ROIC 较低 ({avg_roic_pct})，甚至可能低于其加权平均资本成本(WACC)。这是一面警钟，说明公司本质上属于平庸企业。如果管理层还一味地留存利润进行再投资，就是在蚕食股东的财富。")
+            commentary.append(f"该公司的平均 ROIC 较低 ({avg_roic_pct})，甚至可能低于其加权平均资本成本 (WACC)。这是一面警钟，说明公司本质上属于平庸企业。如果管理层还一味地留存利润进行再投资，就是在蚕食股东的财富。")
 
         # Analyze ROIIC & Reinvestment
-        commentary.append("#### 2. 增量资本利用效率 (ROIIC 审计)")
+        commentary.append("###### 2. 增量资本利用效率 (ROIIC)")
         if score_dict["roiic_score"] >= 90:
-            commentary.append(f"最新一期 ROIIC 高达 {latest_roiic_pct}，极其优秀！这说明管理层**不仅守业成功，创业开拓也极其高效**。他们把留存下来的每一分盈余都投在了极高回报的新项目上，未发生‘资本帝国的盲目扩张(Diworsification)’，展现了大师级的资本配置水准。")
+            commentary.append(f"最新一期 ROIIC 高达 {latest_roiic_pct}，极其优秀！这说明管理层不仅守业成功，创业开拓也极其高效。他们把留存下来的每一分盈余都投在了极高回报的新项目上，未发生“资本帝国的盲目扩张 (Diworsification)”，展现了大师级的资本配置水准。")
         elif score_dict["roiic_score"] >= 75:
             commentary.append(f"增量回报率 ROIIC 为 {latest_roiic_pct}，表现合格。公司能将留存利润有效地部署在生产性资产中，并产生不错的新增利润。然而，这与存量 ROIC 相比存在一定差值，可能预示着随着企业规模变大，高回报的投资机会正在逐步减少。")
         else:
-            commentary.append(f"增量再投资回报率 ROIIC 仅为 {latest_roiic_pct}，形势严峻。这代表公司面临典型的**“规模陷阱”**——存量业务虽然赚钱，但新增投资却是在低回报甚至亏损的项目中‘打水漂’。管理层应当立即减少资本支出，将利润全额分红或用于回购，而不是盲目留存。")
+            commentary.append(f"增量再投资回报率 ROIIC 仅为 {latest_roiic_pct}，形势严峻。这代表公司面临典型的“规模陷阱”——存量业务虽然赚钱，但新增投资却是在低回报甚至亏损的项目中“打水漂”。管理层应当立即减少资本支出，将利润全额分红或用于回购，而不是盲目留存。")
 
         # Analyze One-Dollar Rule
-        commentary.append("#### 3. 市场价值创造审计 (一美元原则)")
+        commentary.append("###### 3. 市场价值创造（一美元原则）")
         if score_dict["one_dollar_score"] >= 85:
-            commentary.append(f"一美元原则系数为 {latest_1d}（大于1.0）。说明在资本市场上，管理层留存的每一元留存盈余，都已经成功转化为了超过一元的市场价值增量。这代表市场对管理层长期留存资金的决策投下了强烈的‘信任票’。")
+            commentary.append(f"一美元原则系数为 {latest_1d}（大于 1.0）。说明在资本市场上，管理层留存的每一元留存盈余，都已经成功转化为了超过一元的市场价值增量。这代表市场对管理层长期留存资金的决策投下了强烈的“信任票”。")
         else:
-            commentary.append(f"一美元原则系数为 {latest_1d}（小于1.0）。这是一个经典的危险信号！在过去5年里，管理层截留了大量本应属于股东的现金，但公司的市值增长却远落后于留存资金的规模。管理层面临资本配置失效，市值管理能力不足，或者留存项目不被市场认可。")
+            commentary.append(f"一美元原则系数为 {latest_1d}（小于 1.0）。这是一个经典的危险信号！在过去 5 年里，管理层截留了大量本应属于股东的现金，但公司的市值增长却远落后于留存资金的规模。管理层面临资本配置失效，市值管理能力不足，或者留存项目不被市场认可。")
 
         # Analyze Buybacks
-        commentary.append("#### 4. 特殊资本决策审计 (回购与派息时点)")
+        commentary.append("###### 4. 特殊资本决策（回购与派息时点）")
         buyback_years = self.df[self.df["buybacks_paid"] > 0]
         if buyback_years.empty:
             commentary.append("在审计期间，该公司未进行显著的股票回购。管理层的分配方向可能侧重于现金分红或留存再投资。如果公司 ROIC 极高，不回购是可以接受的；但若公司估值极低且 ROIC 下滑，未执行回购则可能错失了增厚股东每股价值的黄金机会。")
@@ -294,23 +294,23 @@ class ManagementAuditor:
             blind_buybacks = buyback_years[buyback_years["Buyback_Audit_Rating"].str.contains("盲目")]
             
             if not excellent_buybacks.empty and blind_buybacks.empty:
-                commentary.append("管理层在回购决策上表现出了**极高智慧**。主要回购均发生在股价低于每股保守内在价值时（即安全边际充足的‘黄金买点’），这种低位注销股份的行为实实在在地增厚了长期持有者的‘所有者权益’。")
+                commentary.append("管理层在回购决策上表现出了**极高智慧**。主要回购均发生在股价低于每股保守内在价值时（即安全边际充足的“黄金买点”），这种低位注销股份的行为实实在在地增厚了长期持有者的“所有者权益”。")
             elif not blind_buybacks.empty and excellent_buybacks.empty:
-                commentary.append("警告：管理层的回购存在明显的**“高位接盘”/“市值操纵”**嫌疑。他们在股价高企、远超内在价值的泡沫时期执行了大笔回购，这其实是在用真金白银补贴离场股东，却极大地损害了长期留守股东的利益，属于反向资本配置决策。")
+                commentary.append("警告：管理层的回购存在明显的“高位接盘”、“市值操纵”嫌疑。他们在股价高企、远超内在价值的泡沫时期执行了大笔回购，这其实是在用真金白银补贴离场股东，却极大地损害了长期留守股东的利益，属于反向资本配置决策。")
             elif not excellent_buybacks.empty and not blind_buybacks.empty:
                 commentary.append("管理层的回购动作毁誉参半。既有在行业周期底部、股价低估时的果断出手，也存在在牛市高峰、高估值时为了迎合市场而进行的高位回购。资本配置的纪律性仍有提升空间。")
             else:
-                commentary.append("公司的回购价格基本维持在公允内在价值附近，起到了中规中矩的‘股本注销’作用。没有造成重大的价值损失，但也没有创造显著的超额复利。")
+                commentary.append("公司的回购价格基本维持在公允内在价值附近，起到了中规中矩的“股本注销”作用。没有造成重大的价值损失，但也没有创造显著的超额复利。")
 
         # Final advice
-        commentary.append("#### ⚖️ 审计结论与投资建议")
+        commentary.append("##### ⚖️ 审计结论与投资建议")
         if grade in ["A+", "A"]:
-            commentary.append("👉 **投资评级：极高推荐度 (High Conviction Buy - From Allocation Perspective)**\n\n该公司拥有极其罕见的‘超级护城河’，同时管理层展现了巴菲特级别的资本配置艺术：**高 ROIC、高 ROIIC、回购精准、市场认可。** 对于这样的公司，估值合理时应坚决重仓买入，并长期持有，让时间与管理层一起为您复利滚雪球。")
+            commentary.append("👉 **投资评级：极高推荐度 (High Conviction Buy - From Allocation Perspective)**\n\n该公司拥有极其罕见的“超级护城河”，同时管理层展现了巴菲特级别的资本配置艺术：**高 ROIC、高 ROIIC、回购精准、市场认可。** 对于这样的公司，估值合理时应坚决重仓买入，并长期持有，让时间与管理层一起为您复利滚雪球。")
         elif grade in ["B"]:
-            commentary.append("👉 **投资评级：持有 / 逢低买入 (Strong Hold)**\n\n该公司属于优秀的‘价值创造者’。管理层资本配置能力及格偏上。虽然随着规模变大增量效率稍显平庸，但护城河基本盘依然稳固。建议结合当前股价的安全边际（PB/PE/DCF折扣）进行定投或分批买入。")
+            commentary.append("👉 **投资评级：持有 / 逢低买入 (Strong Hold)**\n\n该公司属于优秀的“价值创造者”。管理层资本配置能力及格偏上。虽然随着规模变大增量效率稍显平庸，但护城河基本盘依然稳固。建议结合当前股价的安全边际（PB/PE/DCF 折扣）进行定投或分批买入。")
         elif grade in ["C"]:
             commentary.append("👉 **投资评级：中性 / 谨慎观望 (Hold / Neutral)**\n\n公司管理层在资本配置上暴露出了一定的问题：可能是新增投资效率极低，亦或是在高估值时期盲目回购、大手笔并购积累商誉。需要密切关注管理层是否会转变为“现金奶牛”开始加大分红。若无明显的分配策略转型，暂不建议重仓。")
         else:
-            commentary.append("👉 **投资评级：警惕 / 避坑 (Avoid - Value Destroyer)**\n\n**强烈建议避开该标的！** 即使财报上的名义利润可能好看，但系统的‘照妖镜’审计表明，管理层正在以极低的效率耗费社会资本，通过低回报再投资、高价接盘回购或无谓的商誉减值来摧毁股东资产。一美元原则极差，是不折不扣的‘价值毁灭者’。")
+            commentary.append("👉 **投资评级：警惕 / 避坑 (Avoid - Value Destroyer)**\n\n**强烈建议避开该标的！** 即使财报上的名义利润可能好看，但系统的“照妖镜”审计表明，管理层正在以极低的效率耗费社会资本，通过低回报再投资、高价接盘回购或无谓的商誉减值来摧毁股东资产。一美元原则极差，是不折不扣的“价值毁灭者”。")
 
         return "\n".join(commentary)

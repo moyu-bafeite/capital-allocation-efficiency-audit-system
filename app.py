@@ -493,7 +493,7 @@ elif selected_section == "🎁 股份回购与红利分配 (Share Repurchase & D
         x=audited_df.index,
         y=audited_df["Intrinsic_Value_Share"],
         mode="lines+markers",
-        name="保守每股内在价值 (估值锚点)",
+        name="保守每股内在价值（估值锚点）",
         line=dict(color="#00ffcc", width=3),
         marker=dict(size=8)
     ))
@@ -519,7 +519,7 @@ elif selected_section == "🎁 股份回购与红利分配 (Share Repurchase & D
     ))
 
     fig_buyback.update_layout(
-        title="每股内在价值(估值锚) vs. 年度均价 vs. 实际回购成交价",
+        title="每股内在价值（估值锚） vs. 年度均价 vs. 实际回购成交价",
         xaxis_title="年份",
         yaxis_title=f"价格 ({validated_input.currency})",
         xaxis=dict(
@@ -535,7 +535,7 @@ elif selected_section == "🎁 股份回购与红利分配 (Share Repurchase & D
     st.plotly_chart(fig_buyback, use_container_width=True)
 
     # Buyback Audit Table
-    st.markdown("##### 📝 历年回购决策审计明细")
+    st.markdown("###### 📝 历年回购决策审计明细")
     audit_display_df = audited_df[[
         "dividends_paid", "buybacks_paid", "buybacks_shares_m", 
         "Buyback_Price_Share", "Intrinsic_Value_Share", "Buyback_to_Intrinsic_Ratio", "Buyback_Audit_Rating"
@@ -543,8 +543,8 @@ elif selected_section == "🎁 股份回购与红利分配 (Share Repurchase & D
     
     # Rename for professional look
     audit_display_df.columns = [
-        "现金派息总额", "回购现金支出", "回购股份数量(百万股)", 
-        "实际回购均价", "每股估算内在价值", "回购均价/内在价值", "回购效率审计结论"
+        "现金派息总额", "回购现金支出", "回购股份数量（百万股）", 
+        "实际回购均价", "每股估算内在价值", "回购均价 / 内在价值", "回购效率审计结论"
     ]
     
     # Formatting
@@ -552,7 +552,7 @@ elif selected_section == "🎁 股份回购与红利分配 (Share Repurchase & D
         audit_display_df.style.format({
             "现金派息总额": "{:,.1f}",
             "回购现金支出": "{:,.1f}",
-            "回购股份数量(百万股)": "{:,.2f}",
+            "回购股份数量（百万股）": "{:,.2f}",
             "实际回购均价": "{:,.2f}",
             "每股估算内在价值": "{:,.2f}",
             "回购均价/内在价值": "{:.2%}"
@@ -570,7 +570,7 @@ elif selected_section == "🎁 股份回购与红利分配 (Share Repurchase & D
 # ----------------- TAB 4: SCORECARD & ADVICE -----------------
 elif selected_section == "🏆 资本配置能力综合量化评分 (Capital Allocation Scorecard)":
     st.markdown("#### 🏆 资本配置能力综合量化评分 (Capital Allocation Scorecard)")
-    st.markdown("结合定量算法，对存量利能力、增量再投资能力、一美元创造效率、回购纪律及股东派息慷慨度进行多维度加权打分：")
+    st.markdown("结合定量算法，对增量再投资能力、一美元创造效率、回购纪律及股东派息慷慨度进行多维度加权打分：")
 
     col_score1, col_score2 = st.columns([1, 2])
     
@@ -579,16 +579,17 @@ elif selected_section == "🏆 资本配置能力综合量化评分 (Capital All
         <div style="background-color: #171923; padding: 2rem; border-radius: 1rem; border: 2px solid #00ffcc; text-align: center;">
             <p style="font-size: 1.2rem; color: #8892b0; margin-bottom: 0.5rem;">期末审计评级</p>
             <p style="font-size: 5.5rem; font-weight: 900; color: #00ffcc; margin: 0; line-height: 1;">{scorecard['grade']}</p>
-            <p style="font-size: 1.5rem; color: #ffffff; margin-top: 1rem; font-weight: bold;">综合分: {scorecard['composite_score']} / 100</p>
+            <p style="font-size: 1.5rem; color: #ffffff; margin-top: 1rem; font-weight: bold;">综合分： {scorecard['composite_score']}/100</p>
         </div>
         """, unsafe_allow_html=True)
+        st.markdown("-----")
         
-        st.markdown("##### 📐 五维权重分值细目")
-        st.markdown(f"- 存量资产创利 (ROIC分 - 30%): **{scorecard['roic_score']:.0f}**")
-        st.markdown(f"- 增量利润开拓 (ROIIC分 - 25%): **{scorecard['roiic_score']:.0f}**")
-        st.markdown(f"- 市场市值创造 (一美元分 - 20%): **{scorecard['one_dollar_score']:.0f}**")
-        st.markdown(f"- 回购折折溢价 (回购分 - 15%): **{scorecard['buyback_score']:.0f}**")
-        st.markdown(f"- 分红及再投资适配 (分红分 - 10%): **{scorecard['payout_score']:.0f}**")
+        st.markdown("###### 📐 五维权重分值细目")
+        st.markdown(f"- 存量资产创利 (30%): **{scorecard['roic_score']:.0f}**")
+        st.markdown(f"- 增量利润开拓 (25%): **{scorecard['roiic_score']:.0f}**")
+        st.markdown(f"- 市场市值创造 (20%): **{scorecard['one_dollar_score']:.0f}**")
+        st.markdown(f"- 回购折折溢价 (15%): **{scorecard['buyback_score']:.0f}**")
+        st.markdown(f"- 分红及再投资适配 (10%): **{scorecard['payout_score']:.0f}**")
 
     with col_score2:
         st.markdown(commentary)
@@ -596,8 +597,8 @@ elif selected_section == "🏆 资本配置能力综合量化评分 (Capital All
 
 # ----------------- TAB 5: FINANCIAL TABLES -----------------
 elif selected_section == "📋 财务数据标准化原始审计底表 (Standardized Financial Indicator Ledger)":
-    st.subheader("📋 审计模型处理底表数据 (Raw Data & Intermediaries)")
-    st.markdown("以下为系统输入参数以及计算得出的所有核心中间指标，您可以直接用于导出和复算：")
+    st.markdown("#### 📋 审计模型处理底表数据 (Raw Data & Intermediaries)")
+    st.markdown("以下为系统输入参数以及计算得出的所有核心中间指标：")
     
     # Exclude or re-arrange columns to make it readable
     st.dataframe(processed_df.style.format("{:,.2f}"), use_container_width=True)
