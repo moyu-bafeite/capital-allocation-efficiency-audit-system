@@ -145,7 +145,39 @@ maint_capex_ratio = st.sidebar.slider(
     help="巴菲特定义‘所有者盈余’时需扣除维持目前业务所需资本开支(Maintenance CapEx)。财报中一般未披露，50%为保守默认估算值。"
 )
 
-st.sidebar.subheader("2. 两阶段 DCF 估值模型参数")
+st.sidebar.subheader("2. ROIIC 滚动窗口与滞后参数")
+num_years = len(validated_input.years)
+max_roiic_window = max(1, num_years - 1)
+
+roiic_window_1 = st.sidebar.number_input(
+    "ROIIC 短窗口年数",
+    min_value=1,
+    max_value=max_roiic_window,
+    value=min(3, max_roiic_window),
+    step=1,
+    help="用于生成第一个 ROIIC / ROIIC Retained 滚动窗口，默认 3 年。"
+)
+
+roiic_window_2 = st.sidebar.number_input(
+    "ROIIC 长窗口年数",
+    min_value=1,
+    max_value=max_roiic_window,
+    value=min(5, max_roiic_window),
+    step=1,
+    help="用于生成第二个 ROIIC / ROIIC Retained 滚动窗口，默认 5 年。"
+)
+
+max_roiic_retained_lag = max(0, num_years - max(roiic_window_1, roiic_window_2))
+roiic_retained_lag = st.sidebar.number_input(
+    "ROIIC Retained 留存收益滞后年数",
+    min_value=0,
+    max_value=max_roiic_retained_lag,
+    value=min(1, max_roiic_retained_lag),
+    step=1,
+    help="lag=1 时，计算 T+3 的 3 年 ROIIC Retained 会使用 T、T+1、T+2 的累计留存收益。"
+)
+
+st.sidebar.subheader("3. 两阶段 DCF 估值模型参数")
 wacc = st.sidebar.slider(
     "折现率 (WACC / 机会成本)",
     min_value=0.05,
@@ -184,7 +216,13 @@ terminal_g = st.sidebar.slider(
 
 # Initialize engines
 calc = FinancialCalculator(validated_input, maintenance_capex_ratio=maint_capex_ratio)
-processed_df = calc.get_processed_df(roiic_window_1=3, roiic_window_2=5)
+processed_df = calc.get_processed_df(
+    roiic_window_1=roiic_window_1,
+    roiic_window_2=roiic_window_2,
+    roiic_retained_lag=roiic_retained_lag
+)
+roiic_retained_col_1 = f"ROIIC_Retained_{roiic_window_1}Y"
+roiic_retained_col_2 = f"ROIIC_Retained_{roiic_window_2}Y"
 
 auditor = ManagementAuditor(processed_df)
 # Compute intrinsic values under custom DCF
@@ -223,7 +261,7 @@ selected_section = st.selectbox(
     [
         "📊 累计资本分配流向 (Cumulative Capital Allocation / Sources & Uses)",
         "🚀 存量与增量资本配置回报率 (ROIC & ROIIC Capital Efficiency)",
-        "🔍 股份回购与红利分配 (Share Repurchase & Dividend Efficacy)",
+        "🎁 股份回购与红利分配 (Share Repurchase & Dividend Efficacy)",
         "🏆 资本配置能力综合量化评分 (Capital Allocation Scorecard)",
         "📋 财务数据标准化原始审计底表 (Standardized Financial Indicator Ledger)"
     ]
@@ -385,29 +423,30 @@ elif selected_section == "🚀 存量与增量资本配置回报率 (ROIC & ROII
         y=audited_df["ROIC"],
         mode="lines+markers",
         name="ROIC（存量回报率）",
-        line=dict(color="#10B981", width=3), # 换成亮丽的翡翠绿
+        line=dict(color="#10B981", width=3),
         marker=dict(size=8, color="#10B981")
     ))
     
-    # 2. ROIIC 3Y
+    # 2. ROIIC retained short window
     fig_roic.add_trace(go.Scatter(
         x=audited_df.index,
-        y=audited_df["ROIIC_Retained_3Y"],
+        y=audited_df[roiic_retained_col_1],
         mode="lines+markers",
-        name="ROIIC Retained（3 年滚动增量）",
+        name=f"ROIIC Retained（{roiic_window_1} 年滚动增量，滞后 {roiic_retained_lag} 年）",
         line=dict(color="#3399ff", width=2, dash="dash"),
         marker=dict(size=6)
     ))
 
-    # 3. ROIIC 5Y
-    fig_roic.add_trace(go.Scatter(
-        x=audited_df.index,
-        y=audited_df["ROIIC_Retained_5Y"],
-        mode="lines+markers",
-        name="ROIIC Retained（5 年滚动增量）",
-        line=dict(color="#ff9900", width=2.5, dash="dot"),
-        marker=dict(size=6)
-    ))
+    # 3. ROIIC retained long window
+    if roiic_retained_col_2 != roiic_retained_col_1:
+        fig_roic.add_trace(go.Scatter(
+            x=audited_df.index,
+            y=audited_df[roiic_retained_col_2],
+            mode="lines+markers",
+            name=f"ROIIC Retained（{roiic_window_2} 年滚动增量，滞后 {roiic_retained_lag} 年）",
+            line=dict(color="#ff9900", width=2.5, dash="dot"),
+            marker=dict(size=6)
+        ))
 
     fig_roic.update_layout(
         title="ROIC 与 ROIIC（留存盈余视角）趋势",
@@ -442,9 +481,9 @@ elif selected_section == "🚀 存量与增量资本配置回报率 (ROIC & ROII
 
 
 # ----------------- TAB 3: SHAREHOLDER RETURN & BUYBACKS -----------------
-elif selected_section == "🔍 股份回购与红利分配 (Share Repurchase & Dividend Efficacy)":
-    st.markdown("#### 🔍 股份回购与红利分配 (Share Repurchase & Dividend Efficacy)")
-    st.markdown("许多管理层在牛市顶峰高估值时跟风大额回购（摧毁股东价值），在熊市低谷时却停止回购。本模块对比**实际回购成交均价 vs. 保守每股内在价值(DCF)**，帮您甄别管理层是在**低吸创造复利**，还是在**高位接盘毁灭价值**。")
+elif selected_section == "🎁 股份回购与红利分配 (Share Repurchase & Dividend Efficacy)":
+    st.markdown("#### 🎁 股份回购与红利分配 (Share Repurchase & Dividend Efficacy)")
+    st.markdown("许多管理层在牛市顶峰高估值时跟风大额回购（摧毁股东价值），在熊市低谷时却停止回购。本模块对比**实际回购成交均价和**保守每股内在价值 (DCF)**，甄别管理层是在**低吸创造复利**，还是在**高位接盘毁灭价值**。")
 
     # Double Axis Line Chart
     fig_buyback = go.Figure()

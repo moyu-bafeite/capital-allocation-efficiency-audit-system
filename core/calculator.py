@@ -104,16 +104,18 @@ class FinancialCalculator:
         )
         return pd.Series(roiic, index=self.df.index, name=f"ROIIC_{window}Y")
 
-    def calculate_rolling_roiic_retained(self, window: int = 3) -> pd.Series:
+    def calculate_rolling_roiic_retained(self, window: int = 3, lag: int = 0) -> pd.Series:
         """
         Calculates Rolling ROIIC based on Cumulative Retained Earnings.
-        ROIIC_retained = (NOPAT_t - NOPAT_{t-window}) / (Cumulative Retained Earnings over window)
+        ROIIC_retained = (NOPAT_t - NOPAT_{t-window}) / (Cumulative Retained Earnings over window, shifted by lag years)
         """
+        if lag < 0:
+            raise ValueError("lag must be greater than or equal to 0")
+
         nopat_diff = self.df["NOPAT"].diff(window)
         
-        # Cumulative Retained Earnings in the window (excluding the start year, up to current year)
-        # e.g. for window=3, year 2018 relative to 2015: sum of 2016, 2017, 2018
-        cumulative_retained = self.df["Retained_Earnings_Annual"].rolling(window).sum()
+        # lag=1 uses the completed window before the current year, e.g. T, T+1, T+2 for T+3.
+        cumulative_retained = self.df["Retained_Earnings_Annual"].rolling(window).sum().shift(lag)
 
         roiic_retained = np.where(
             cumulative_retained > 0,
@@ -137,12 +139,13 @@ class FinancialCalculator:
         )
         return pd.Series(one_dollar_test, index=self.df.index, name=f"One_Dollar_Rule_{window}Y")
 
-    def get_processed_df(self, roiic_window_1: int = 3, roiic_window_2: int = 5) -> pd.DataFrame:
+    def get_processed_df(self, roiic_window_1: int = 3, roiic_window_2: int = 5, roiic_retained_lag: int = 1) -> pd.DataFrame:
         """Returns the fully enriched DataFrame with all computed audit metrics."""
         df_copy = self.df.copy()
         df_copy[f"ROIIC_{roiic_window_1}Y"] = self.calculate_rolling_roiic(roiic_window_1)
         df_copy[f"ROIIC_{roiic_window_2}Y"] = self.calculate_rolling_roiic(roiic_window_2)
-        df_copy[f"ROIIC_Retained_{roiic_window_1}Y"] = self.calculate_rolling_roiic_retained(roiic_window_1)
-        df_copy[f"ROIIC_Retained_{roiic_window_2}Y"] = self.calculate_rolling_roiic_retained(roiic_window_2)
+        df_copy[f"ROIIC_Retained_{roiic_window_1}Y"] = self.calculate_rolling_roiic_retained(roiic_window_1, lag=roiic_retained_lag)
+        df_copy[f"ROIIC_Retained_{roiic_window_2}Y"] = self.calculate_rolling_roiic_retained(roiic_window_2, lag=roiic_retained_lag)
+        df_copy[f"One_Dollar_Rule_{roiic_window_1}Y"] = self.calculate_one_dollar_rule(roiic_window_1)
         df_copy[f"One_Dollar_Rule_{roiic_window_2}Y"] = self.calculate_one_dollar_rule(roiic_window_2)
         return df_copy
