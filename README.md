@@ -28,12 +28,20 @@
 .
 ├── app.py                  # Streamlit 应用入口
 ├── core/
-│   ├── auditor.py          # 审计评分、DCF 估值、回购有效性分析
-│   └── calculator.py       # 财务指标计算与数据加工
+│   ├── auditor.py          # 审计模块轻量编排器
+│   ├── buyback_audit.py    # 股份回购纪律审计
+│   ├── calculator.py       # 财务指标计算与数据加工
+│   ├── commentary.py       # 中文审计解读生成
+│   ├── scorecard.py        # 五维量化评分卡
+│   └── valuation.py        # 两阶段 DCF 内在价值估算
 ├── data/
 │   └── tencent_demo.json   # 腾讯控股演示数据
 ├── models/
 │   └── input_schema.py     # 输入数据结构与校验规则
+├── services/
+│   └── audit_pipeline.py   # 自动化审计流水线
+├── tests/                  # 核心量化逻辑单元测试
+├── ui/                     # Streamlit 页面、侧边栏和图表模块
 ├── requirements.txt        # Python 依赖
 └── README.md
 ```
@@ -81,6 +89,9 @@ http://localhost:8501
   "ticker": "0700.HK",
   "company_name": "腾讯控股",
   "currency": "RMB",
+  "amount_unit": "million",
+  "market_currency": "HKD",
+  "exchange_rate_to_reporting_currency": [0.89, 0.83, 0.86, 0.91, 0.91],
   "years": [2020, 2021, 2022, 2023, 2024],
   "financials": {
     "net_profit": [100.0, 120.0, 150.0, 130.0, 180.0],
@@ -105,7 +116,7 @@ http://localhost:8501
 }
 ```
 
-所有 `financials` 字段数组长度必须与 `years` 长度一致，否则会触发 Pydantic 数据校验错误。
+所有 `financials` 字段数组长度以及 `exchange_rate_to_reporting_currency` 长度必须与 `years` 长度一致，否则会触发 Pydantic 数据校验错误。
 
 ## 核心指标说明
 
@@ -128,16 +139,24 @@ http://localhost:8501
 | ROIC 存量资产创利能力 | 30% |
 | ROIIC 增量再投资能力 | 25% |
 | 一美元原则市值创造效率 | 20% |
-| 股份回购纪律 | 15% |
-| 分红及再投资适配度 | 10% |
+| 股份回购纪律 | 10% |
+| 分红及再投资适配度 | 15% |
 
 系统会根据加权得分生成 `A+`、`A`、`B`、`C`、`D`、`F` 等级，并输出中文分析意见。
 
+## 测试
+
+```bash
+python -m unittest discover -s tests
+```
+
 ## 使用建议
 
-- 财务金额字段应保持同一币种、同一数量级口径。
+- 财务金额字段应保持同一币种、同一数量级口径；当前 `amount_unit` 固定为 `million`。
+- `currency` 是财报本位币，所有财务金额字段都应按该币种录入。
+- `market_currency` 是 `avg_stock_price` 的币种；系统会使用 `exchange_rate_to_reporting_currency` 将股价折算到 `currency` 后再计算市值和一美元原则。
 - `shares_outstanding_m` 和 `buybacks_shares_m` 使用百万股口径。
-- `avg_stock_price` 应与 `currency` 保持一致。
+- `buybacks_paid` 应使用财报本位币和 `amount_unit` 口径，确保回购均价能与每股内在价值同币种比较。
 - 对于自定义公司数据，建议至少提供 5 年以上数据，以便 ROIIC 和一美元原则指标具备参考意义。
 - DCF 参数会显著影响内在价值估算，应结合行业、利率和公司成长阶段审慎调整。
 

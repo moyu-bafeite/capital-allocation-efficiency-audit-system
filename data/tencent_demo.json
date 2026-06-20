@@ -2,6 +2,9 @@
   "ticker": "0700.HK",
   "company_name": "腾讯控股",
   "currency": "RMB",
+  "amount_unit": "million",
+  "market_currency": "HKD",
+  "exchange_rate_to_reporting_currency": [0.79, 0.86, 0.87, 0.84, 0.88, 0.89, 0.83, 0.86, 0.91, 0.91],
   "years": [2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024],
   "financials": {
     "net_profit": [28806, 41099, 71510, 78719, 93310, 159847, 224822, 188243, 115216, 157000],

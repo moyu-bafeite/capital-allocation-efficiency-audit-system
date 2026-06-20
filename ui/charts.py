@@ -1,0 +1,186 @@
+import plotly.express as px
+import plotly.graph_objects as go
+
+
+def create_waterfall_chart(waterfall_data: dict, start_year: int, end_year: int) -> go.Figure:
+    x_labels = ["经营现金流（总流入）", "资本支出 (CapEx)", "现金分红", "股份回购", "投资与并购", "其他现金 / 债务留存"]
+    y_values = [
+        waterfall_data["Total_Operating_Cash_Flow"],
+        -waterfall_data["CapEx"],
+        -waterfall_data["Dividends"],
+        -waterfall_data["Buybacks"],
+        -waterfall_data["M_and_A"],
+        -waterfall_data["Other_Retention"],
+    ]
+
+    max_value = max(abs(value) for value in y_values)
+    if max_value >= 1000:
+        scale = 1000.0
+        unit_label = "Billions"
+        suffix = "B"
+    else:
+        scale = 1.0
+        unit_label = "Millions"
+        suffix = "M"
+
+    fig = go.Figure(
+        go.Waterfall(
+            name="Capital Flow",
+            orientation="v",
+            measure=["absolute", "relative", "relative", "relative", "relative", "total"],
+            x=x_labels,
+            textposition="outside",
+            text=[f"{value / scale:.1f}{suffix}" for value in y_values],
+            y=y_values,
+            connector={"line": {"color": "rgb(63, 63, 63)", "width": 1.5}},
+            decreasing={"marker": {"color": "#ff4d4d"}},
+            increasing={"marker": {"color": "#00ffcc"}},
+            totals={"marker": {"color": "#3399ff"}},
+        )
+    )
+
+    title_text = (
+        f"{start_year} - {end_year} 年累计资本分配去向瀑布图（单位：{unit_label}）"
+        if start_year != end_year
+        else f"{start_year} 年度单年资本分配去向瀑布图（单位：{unit_label}）"
+    )
+    fig.update_layout(
+        title=title_text,
+        waterfallgap=0.3,
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(color="#ffffff"),
+        height=500,
+    )
+    return fig
+
+
+def create_allocation_pie_chart(waterfall_data: dict) -> go.Figure:
+    fig = px.pie(
+        names=["资本支出 (CapEx)", "现金分红", "股份回购", "投资并购", "其他现金 / 债务留存"],
+        values=[
+            waterfall_data["CapEx"],
+            waterfall_data["Dividends"],
+            waterfall_data["Buybacks"],
+            waterfall_data["M_and_A"],
+            max(0, waterfall_data["Other_Retention"]),
+        ],
+        hole=0.4,
+        color_discrete_sequence=["#10B981", "#3B82F6", "#EC4899", "#F59E0B", "#6B7280"],
+    )
+    fig.update_layout(
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(color="#ffffff"),
+        height=350,
+        margin=dict(t=10, b=10, l=10, r=10),
+    )
+    return fig
+
+
+def create_roic_chart(
+    audited_df,
+    roiic_retained_col_1: str,
+    roiic_retained_col_2: str,
+    roiic_window_1: int,
+    roiic_window_2: int,
+    roiic_retained_lag: int,
+) -> go.Figure:
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=audited_df.index,
+            y=audited_df["ROIC"],
+            mode="lines+markers",
+            name="ROIC（存量回报率）",
+            line=dict(color="#10B981", width=3),
+            marker=dict(size=8, color="#10B981"),
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=audited_df.index,
+            y=audited_df[roiic_retained_col_1],
+            mode="lines+markers",
+            name=f"ROIIC Retained（{roiic_window_1} 年滚动增量，滞后 {roiic_retained_lag} 年）",
+            line=dict(color="#3399ff", width=2, dash="dash"),
+            marker=dict(size=6),
+        )
+    )
+
+    if roiic_retained_col_2 != roiic_retained_col_1:
+        fig.add_trace(
+            go.Scatter(
+                x=audited_df.index,
+                y=audited_df[roiic_retained_col_2],
+                mode="lines+markers",
+                name=f"ROIIC Retained（{roiic_window_2} 年滚动增量，滞后 {roiic_retained_lag} 年）",
+                line=dict(color="#ff9900", width=2.5, dash="dot"),
+                marker=dict(size=6),
+            )
+        )
+
+    fig.update_layout(
+        title="ROIC 与 ROIIC（留存盈余视角）趋势",
+        xaxis_title="年份",
+        yaxis_title="回报率",
+        xaxis=dict(tickmode="linear", tick0=min(audited_df.index), dtick=1),
+        yaxis=dict(tickformat=".1%"),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(color="#ffffff"),
+        height=500,
+        legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="center", x=0.5),
+    )
+    return fig
+
+
+def create_buyback_chart(display_df, market_currency: str) -> go.Figure:
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=display_df.index,
+            y=display_df["Intrinsic_Value_Share_Market_Currency"],
+            mode="lines+markers",
+            name="保守每股内在价值（折算为市场币种）",
+            line=dict(color="#00ffcc", width=3),
+            marker=dict(size=8),
+            hovertemplate="%{x}<br>%{y:,.2f}<extra></extra>",
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=display_df.index,
+            y=display_df["avg_stock_price"],
+            mode="lines+markers",
+            name="年平均交易股价",
+            line=dict(color="#8892b0", width=1.5, dash="dash"),
+            marker=dict(size=5),
+            hovertemplate="%{x}<br>%{y:,.2f}<extra></extra>",
+        )
+    )
+
+    buyback_active = display_df[display_df["Buyback_Price_Share_Market_Currency"] > 0]
+    fig.add_trace(
+        go.Scatter(
+            x=buyback_active.index,
+            y=buyback_active["Buyback_Price_Share_Market_Currency"],
+            mode="markers",
+            name="实际股份回购均价",
+            marker=dict(color="#ff3366", size=12, symbol="triangle-up", line=dict(color="#ffffff", width=1.5)),
+            hovertemplate="%{x}<br>%{y:,.2f}<extra></extra>",
+        )
+    )
+
+    fig.update_layout(
+        title="每股内在价值（估值锚）vs. 年度均价 vs. 实际回购成交价",
+        xaxis_title="年份",
+        yaxis_title=f"价格 ({market_currency})",
+        yaxis=dict(tickformat=",.2f"),
+        xaxis=dict(tickmode="linear", tick0=min(display_df.index), dtick=1),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(color="#ffffff"),
+        height=500,
+    )
+    return fig

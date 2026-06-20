@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from typing import Dict, Any, List
+from typing import Dict
 from models.input_schema import CompanyAuditInput
 
 class FinancialCalculator:
@@ -11,6 +11,8 @@ class FinancialCalculator:
         :param data: CompanyAuditInput pydantic object.
         :param maintenance_capex_ratio: The portion of CapEx that goes to maintaining current business operations (0.0 to 1.0).
         """
+        if maintenance_capex_ratio < 0 or maintenance_capex_ratio > 1:
+            raise ValueError("maintenance_capex_ratio must be between 0 and 1")
         self.data = data
         self.maintenance_capex_ratio = maintenance_capex_ratio
         self.df = self._to_dataframe()
@@ -21,6 +23,7 @@ class FinancialCalculator:
         years = self.data.years
         fin_dict = self.data.financials.model_dump()
         df = pd.DataFrame(fin_dict, index=years)
+        df["exchange_rate_to_reporting_currency"] = self.data.exchange_rate_to_reporting_currency
         df.index.name = "Year"
         return df
 
@@ -49,8 +52,11 @@ class FinancialCalculator:
         self.df["maintenance_capex"] = maintenance_capex
         self.df["Owner_Earnings"] = self.df["net_profit"] + self.df["da"] - maintenance_capex
 
-        # 5. Market Capitalization
-        self.df["Market_Cap"] = self.df["shares_outstanding_m"] * self.df["avg_stock_price"]
+        # 5. Market Capitalization, converted to the reporting currency.
+        self.df["avg_stock_price_reporting_currency"] = (
+            self.df["avg_stock_price"] * self.df["exchange_rate_to_reporting_currency"]
+        )
+        self.df["Market_Cap"] = self.df["shares_outstanding_m"] * self.df["avg_stock_price_reporting_currency"]
 
         # 6. Retained Earnings
         # Retained Earnings = Net Profit - Dividends - Buybacks
@@ -60,6 +66,8 @@ class FinancialCalculator:
 
     def get_waterfall_data(self, start_year: int = None, end_year: int = None) -> Dict[str, float]:
         """Calculates cumulative cash sources and uses over a specified period or the entire period."""
+        if start_year is not None and end_year is not None and start_year > end_year:
+            raise ValueError("start_year must be less than or equal to end_year")
         df_filtered = self.df
         if start_year is not None and end_year is not None:
             df_filtered = self.df.loc[start_year:end_year]
@@ -93,6 +101,8 @@ class FinancialCalculator:
         Calculates Rolling Incremental ROIC (ROIIC) over a specified year window.
         ROIIC = (NOPAT_t - NOPAT_{t-window}) / (IC_t - IC_{t-window})
         """
+        if window <= 0:
+            raise ValueError("window must be greater than 0")
         nopat_diff = self.df["NOPAT"].diff(window)
         ic_diff = self.df["Invested_Capital"].diff(window)
 
@@ -109,6 +119,8 @@ class FinancialCalculator:
         Calculates Rolling ROIIC based on Cumulative Retained Earnings.
         ROIIC_retained = (NOPAT_t - NOPAT_{t-window}) / (Cumulative Retained Earnings over window, shifted by lag years)
         """
+        if window <= 0:
+            raise ValueError("window must be greater than 0")
         if lag < 0:
             raise ValueError("lag must be greater than or equal to 0")
 
@@ -129,6 +141,8 @@ class FinancialCalculator:
         Calculates Buffet's $1 Rule:
         Market Cap Increase / Cumulative Retained Earnings over a specified window.
         """
+        if window <= 0:
+            raise ValueError("window must be greater than 0")
         market_cap_diff = self.df["Market_Cap"].diff(window)
         cumulative_retained = self.df["Retained_Earnings_Annual"].rolling(window).sum()
 
@@ -141,6 +155,10 @@ class FinancialCalculator:
 
     def get_processed_df(self, roiic_window_1: int = 3, roiic_window_2: int = 5, roiic_retained_lag: int = 1) -> pd.DataFrame:
         """Returns the fully enriched DataFrame with all computed audit metrics."""
+        if roiic_window_1 <= 0 or roiic_window_2 <= 0:
+            raise ValueError("ROIIC windows must be greater than 0")
+        if roiic_retained_lag < 0:
+            raise ValueError("roiic_retained_lag must be greater than or equal to 0")
         df_copy = self.df.copy()
         df_copy[f"ROIIC_{roiic_window_1}Y"] = self.calculate_rolling_roiic(roiic_window_1)
         df_copy[f"ROIIC_{roiic_window_2}Y"] = self.calculate_rolling_roiic(roiic_window_2)

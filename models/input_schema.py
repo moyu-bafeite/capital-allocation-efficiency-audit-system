@@ -1,7 +1,10 @@
 from pydantic import BaseModel, Field, model_validator
-from typing import List
+from typing import List, Literal
 
 class FinancialsSchema(BaseModel):
+    """
+    All financial amount fields use reporting currency and amount_unit unless noted otherwise.
+    """
     net_profit: List[float] = Field(..., description="Net profit attributable to shareholders")
     ebit: List[float] = Field(..., description="EBIT (Earnings before interest and tax)")
     tax_rate: List[float] = Field(..., description="Effective tax rate (e.g. 0.18)")
@@ -14,27 +17,81 @@ class FinancialsSchema(BaseModel):
     capex: List[float] = Field(..., description="Capital expenditures")
     da: List[float] = Field(..., description="Depreciation and amortization")
     dividends_paid: List[float] = Field(..., description="Dividends paid to shareholders")
-    buybacks_paid: List[float] = Field(..., description="Cash paid for stock repurchases")
+    buybacks_paid: List[float] = Field(..., description="Cash paid for stock repurchases, in reporting currency and amount_unit")
     buybacks_shares_m: List[float] = Field(..., description="Number of shares repurchased in millions")
     ma_paid: List[float] = Field(..., description="Cash paid for acquisitions / M&A")
     goodwill: List[float] = Field(..., description="Goodwill on balance sheet")
     shares_outstanding_m: List[float] = Field(..., description="Number of shares outstanding in millions")
-    avg_stock_price: List[float] = Field(..., description="Average annual stock price")
+    avg_stock_price: List[float] = Field(..., description="Average annual stock price, in market_currency per share")
 
 class CompanyAuditInput(BaseModel):
     ticker: str
     company_name: str
-    currency: str
+    currency: str = Field(..., description="Reporting currency used by all financial statement amount fields")
+    amount_unit: Literal["million"] = Field(..., description="Financial amount unit. Must be 'million' because share counts are in millions.")
+    market_currency: str = Field(..., description="Currency used by avg_stock_price")
+    exchange_rate_to_reporting_currency: List[float] = Field(..., description="Annual exchange rate: market_currency * rate = reporting currency")
     years: List[int]
     financials: FinancialsSchema
 
     @model_validator(mode="after")
     def validate_lengths(self) -> "CompanyAuditInput":
         num_years = len(self.years)
+        if num_years < 2:
+            raise ValueError("At least two years of financial data are required")
+        if any(year <= prev_year for prev_year, year in zip(self.years, self.years[1:])):
+            raise ValueError("years must be strictly increasing")
+        if not self.ticker.strip() or not self.company_name.strip():
+            raise ValueError("ticker and company_name must not be empty")
+        if not self.currency.strip() or not self.market_currency.strip():
+            raise ValueError("currency and market_currency must not be empty")
+
+        if len(self.exchange_rate_to_reporting_currency) != num_years:
+            raise ValueError(
+                f"Field 'exchange_rate_to_reporting_currency' must have length {num_years} to match 'years', but got length {len(self.exchange_rate_to_reporting_currency)}"
+            )
+        if any(rate <= 0 for rate in self.exchange_rate_to_reporting_currency):
+            raise ValueError("All exchange rates must be greater than 0")
+
         for name, field_value in self.financials.__dict__.items():
             if isinstance(field_value, list):
                 if len(field_value) != num_years:
                     raise ValueError(
                         f"Field '{name}' in financials must have length {num_years} to match 'years', but got length {len(field_value)}"
                     )
+
+        if any(rate < 0 or rate > 1 for rate in self.financials.tax_rate):
+            raise ValueError("All tax_rate values must be between 0 and 1")
+        if any(shares <= 0 for shares in self.financials.shares_outstanding_m):
+            raise ValueError("All shares_outstanding_m values must be greater than 0")
+        if any(price <= 0 for price in self.financials.avg_stock_price):
+            raise ValueError("All avg_stock_price values must be greater than 0")
+
+        non_negative_fields = [
+            "interest_expense",
+            "short_term_debt",
+            "long_term_debt",
+            "cash_and_equivalents",
+            "capex",
+            "da",
+            "dividends_paid",
+            "buybacks_paid",
+            "buybacks_shares_m",
+            "ma_paid",
+            "goodwill",
+        ]
+        for field_name in non_negative_fields:
+            values = getattr(self.financials, field_name)
+            if any(value < 0 for value in values):
+                raise ValueError(f"All {field_name} values must be greater than or equal to 0")
+
+        for year, buybacks_paid, buyback_shares in zip(
+            self.years,
+            self.financials.buybacks_paid,
+            self.financials.buybacks_shares_m,
+        ):
+            if buybacks_paid > 0 and buyback_shares <= 0:
+                raise ValueError(f"buybacks_shares_m must be greater than 0 when buybacks_paid is positive in {year}")
+            if buyback_shares > 0 and buybacks_paid <= 0:
+                raise ValueError(f"buybacks_paid must be greater than 0 when buybacks_shares_m is positive in {year}")
         return self
