@@ -25,7 +25,7 @@ def generate_commentary(df: pd.DataFrame, score_dict: Dict[str, Any]) -> str:
     )
 
     commentary = []
-    commentary.append(f"##### 🎯 审计成绩单：**{grade}** (综合分：{score_dict['composite_score']}/100)")
+    commentary.append(f"##### 🎯 审计成绩单：**{grade}**（综合分：{score_dict['composite_score']}/100）")
     commentary.append("**核心财务特征概览**：")
     commentary.append(f"- 历史平均投入资本回报率 (ROIC)：**{avg_roic_pct}**")
     commentary.append(f"- {roiic_period}累计留存盈余再投资回报率 (ROIIC)：**{latest_roiic_pct}**")

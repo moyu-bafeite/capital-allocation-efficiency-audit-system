@@ -15,6 +15,27 @@ def configure_page() -> None:
     st.markdown(
         """
         <style>
+            @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&display=swap');
+
+            /* Global styling for Courier Prime */
+            html, body, [data-testid="stAppViewContainer"], .main, .sidebar {
+                font-family: 'Courier Prime', monospace;
+            }
+
+            /* Apply Courier Prime to standard text and UI widgets */
+            h1, h2, h3, h4, h5, h6, p, label, .stMetric, .stMarkdown, input, select, textarea {
+                font-family: 'Courier Prime', monospace !important;
+            }
+
+            button {
+                font-family: 'Courier Prime', monospace;
+            }
+
+            /* Exempt icons from global font styling to ensure stSidebar collapse double arrow displays properly */
+            [data-testid="stIcon"], [class*="Icon"], [class*="icon"], [class*="stIcon"] {
+                font-family: inherit !important;
+            }
+
             .main {
                 background-color: #0f111a;
                 color: #ffffff;
@@ -22,10 +43,18 @@ def configure_page() -> None:
             div[data-testid="stMetricValue"] {
                 font-size: 1.25rem;
                 font-weight: 700;
+                line-height: 1.5rem !important;
+                height: 1.8rem !important;
+                display: flex;
+                align-items: center;
             }
             div[data-testid="stMetricLabel"] {
                 font-size: 0.9rem;
                 color: #8892b0;
+                line-height: 1.2rem !important;
+                height: 1.4rem !important;
+                display: flex;
+                align-items: center;
             }
             h1, h2, h3 {
                 font-weight: 700 !important;

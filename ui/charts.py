@@ -49,7 +49,7 @@ def create_waterfall_chart(waterfall_data: dict, start_year: int, end_year: int)
         waterfallgap=0.3,
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="#ffffff"),
+        font=dict(family="Courier Prime", color="#ffffff"),
         height=500,
     )
     return fig
@@ -71,7 +71,7 @@ def create_allocation_pie_chart(waterfall_data: dict) -> go.Figure:
     fig.update_layout(
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="#ffffff"),
+        font=dict(family="Courier Prime", color="#ffffff"),
         height=350,
         margin=dict(t=10, b=10, l=10, r=10),
     )
@@ -128,7 +128,7 @@ def create_roic_chart(
         yaxis=dict(tickformat=".1%"),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="#ffffff"),
+        font=dict(family="Courier Prime", color="#ffffff"),
         height=500,
         legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="center", x=0.5),
     )
@@ -180,7 +180,7 @@ def create_buyback_chart(display_df, market_currency: str) -> go.Figure:
         xaxis=dict(tickmode="linear", tick0=min(display_df.index), dtick=1),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="#ffffff"),
+        font=dict(family="Courier Prime", color="#ffffff"),
         height=500,
     )
     return fig
