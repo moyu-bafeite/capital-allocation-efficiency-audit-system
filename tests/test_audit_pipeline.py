@@ -14,7 +14,7 @@ class AuditModulesTest(unittest.TestCase):
         df = pd.DataFrame(
             {
                 "Owner_Earnings": [100],
-                "shares_outstanding_m": [100],
+                "shares_outstanding": [100 * 1e6],
             },
             index=[2020],
         )
@@ -26,22 +26,23 @@ class AuditModulesTest(unittest.TestCase):
             growth_stage_2=0.0,
             stage_2_years=1,
             terminal_growth=0.02,
+            amount_unit="million",
         )
 
         expected = (100 / 1.10 + 100 / (1.10**2) + (102 / 0.08) / (1.10**2)) / 100
         self.assertAlmostEqual(series.loc[2020], expected)
 
     def test_dcf_rejects_invalid_terminal_growth(self):
-        df = pd.DataFrame({"Owner_Earnings": [100], "shares_outstanding_m": [100]}, index=[2020])
+        df = pd.DataFrame({"Owner_Earnings": [100], "shares_outstanding": [100 * 1e6]}, index=[2020])
 
         with self.assertRaises(ValueError):
-            calculate_intrinsic_value(df, wacc=0.03, terminal_growth=0.03)
+            calculate_intrinsic_value(df, wacc=0.03, terminal_growth=0.03, amount_unit="million")
 
     def test_buyback_audit_rates_discounted_buybacks_as_excellent(self):
         df = pd.DataFrame(
             {
                 "buybacks_paid": [10],
-                "buybacks_shares_m": [1],
+                "buybacks_shares": [1 * 1e6],
                 "Intrinsic_Value_Share": [20],
             },
             index=[2020],

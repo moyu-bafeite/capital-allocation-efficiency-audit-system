@@ -10,6 +10,7 @@ def calculate_intrinsic_value(
     growth_stage_2: float = 0.04,
     stage_2_years: int = 5,
     terminal_growth: float = 0.02,
+    amount_unit: str = "million",
 ) -> pd.Series:
     """
     Calculate per-share intrinsic value for each year using a two-stage DCF model.
@@ -23,7 +24,8 @@ def calculate_intrinsic_value(
 
     for year in df.index:
         owner_earnings = df.loc[year, "Owner_Earnings"]
-        shares = df.loc[year, "shares_outstanding_m"]
+        shares_raw = df.loc[year, "shares_outstanding"]
+        shares = shares_raw / 1e6 if amount_unit == "million" else shares_raw
 
         if owner_earnings <= 0 or shares <= 0:
             intrinsic_values_per_share.append(np.nan)

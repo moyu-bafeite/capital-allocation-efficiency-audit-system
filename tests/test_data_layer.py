@@ -1,0 +1,126 @@
+import os
+import shutil
+import unittest
+import tempfile
+from typing import Dict, Any, List
+
+from data.cache import DatabaseCache
+from data.normalizer import normalize_audit_data
+from data.manager import DataManager
+from data.providers.base import BaseProvider
+
+class MockProvider(BaseProvider):
+    def fetch_financial_data(self, ticker: str, years: List[int]) -> Dict[str, Any]:
+        return {
+            "ticker": ticker,
+            "company_name": "Mock Inc",
+            "currency": "USD",
+            "amount_unit": "million",
+            "market_currency": "USD",
+            "exchange_rate_to_reporting_currency": [1.0] * len(years),
+            "years": years,
+            "financials": {
+                "net_profit": [100.0] * len(years),
+                "ebit": [120.0] * len(years),
+                "tax_rate": [0.20] * len(years),
+                "interest_expense": [5.0] * len(years),
+                "total_equity": [500.0] * len(years),
+                "short_term_debt": [50.0] * len(years),
+                "long_term_debt": [100.0] * len(years),
+                "cash_and_equivalents": [50.0] * len(years),
+                "operating_cash_flow": [130.0] * len(years),
+                "capex": [40.0] * len(years),
+                "da": [20.0] * len(years),
+                "dividends_paid": [20.0] * len(years),
+                "buybacks_paid": [10.0] * len(years),
+                "buybacks_shares": [1.0 * 1e6] * len(years),
+                "ma_paid": [5.0] * len(years),
+                "goodwill": [10.0] * len(years),
+                "shares_outstanding": [100.0 * 1e6] * len(years),
+                "avg_stock_price": [10.0] * len(years)
+            }
+        }
+
+class DataLayerTest(unittest.TestCase):
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+        self.db_path = os.path.join(self.test_dir, "test_cache.db")
+        self.cache = DatabaseCache(self.db_path)
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir)
+
+    def test_database_cache_initializes_and_saves_inputs(self):
+        sample_input = {
+            "ticker": "TEST",
+            "provider": "mock",
+            "years": [2020, 2021],
+            "financials": {
+                "net_profit": [100.0, 120.0]
+            }
+        }
+        self.cache.save_audit_input("TEST", "mock", sample_input)
+        loaded = self.cache.get_audit_input("TEST", "mock")
+        self.assertIsNotNone(loaded)
+        self.assertEqual(loaded["ticker"], "TEST")
+        self.assertEqual(loaded["financials"]["net_profit"][1], 120.0)
+
+    def test_database_cache_saves_raw_financials(self):
+        years = [2020, 2021]
+        financials = {
+            "net_profit": [100.0, 120.0],
+            "ebit": [120.0, 140.0]
+        }
+        self.cache.save_raw_financials("TEST", "mock", financials, years)
+        loaded = self.cache.get_raw_financials("TEST", "mock", years)
+        self.assertEqual(loaded["net_profit"], [100.0, 120.0])
+        self.assertEqual(loaded["ebit"], [120.0, 140.0])
+
+    def test_database_cache_saves_prices_and_rates(self):
+        self.cache.save_stock_price("TEST", 2020, 15.5)
+        self.cache.save_exchange_rate("HKD", "RMB", 2020, 0.85)
+
+        self.assertEqual(self.cache.get_stock_price("TEST", 2020), 15.5)
+        self.assertEqual(self.cache.get_exchange_rate("HKD", "RMB", 2020), 0.85)
+
+    def test_normalizer_rectifies_negative_values(self):
+        raw_data = {
+            "years": [2020, 2021],
+            "currency": "USD",
+            "amount_unit": "million",
+            "market_currency": "USD",
+            "exchange_rate_to_reporting_currency": [1.0, 1.0],
+            "financials": {
+                "net_profit": [100.0, 120.0],
+                "tax_rate": [0.20, 1.5], # 1.5 should be clipped
+                "capex": [-40.0, -45.0], # should be converted to positive
+                "dividends_paid": [20.0, 25.0],
+                "buybacks_paid": [0.0, 10.0],
+                "buybacks_shares": [0.0, 0.0], # should align
+                "shares_outstanding": [-50.0, 100.0], # should fallback
+                "avg_stock_price": [10.0, -5.0] # should fallback
+            }
+        }
+        normalized = normalize_audit_data(raw_data)
+        self.assertEqual(normalized["financials"]["capex"], [40.0, 45.0])
+        self.assertEqual(normalized["financials"]["tax_rate"][1], 1.0)
+        self.assertEqual(normalized["financials"]["shares_outstanding"][0], 100000000.0)
+        self.assertEqual(normalized["financials"]["avg_stock_price"][1], 10.0)
+        self.assertGreater(normalized["financials"]["buybacks_shares"][1], 0.0)
+
+    def test_data_manager_restores_from_cache_successfully(self):
+        # We replace the cache engine of manager and mock provider
+        manager = DataManager(self.cache)
+        
+        # Prepopulate cache
+        years = [2020, 2021]
+        mock_input = MockProvider().fetch_financial_data("TEST", years)
+        manager.cache.save_audit_input("TEST", "yahoo", mock_input)
+
+        # Call get_audit_input with refresh = False
+        res = manager.get_audit_input("TEST", "yahoo", years, refresh=False)
+        self.assertEqual(res.ticker, "TEST")
+        self.assertEqual(res.company_name, "Mock Inc")
+
+if __name__ == "__main__":
+    unittest.main()

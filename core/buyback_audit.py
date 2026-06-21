@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 
 
-def audit_buybacks(df: pd.DataFrame) -> pd.DataFrame:
+def audit_buybacks(df: pd.DataFrame, amount_unit: str = "million") -> pd.DataFrame:
     """
     Audit buyback timing by comparing repurchase price against intrinsic value.
     """
@@ -10,7 +10,8 @@ def audit_buybacks(df: pd.DataFrame) -> pd.DataFrame:
         raise ValueError("Intrinsic_Value_Share is required before auditing buybacks")
 
     audited_df = df.copy()
-    buyback_shares = audited_df["buybacks_shares_m"]
+    buyback_shares_raw = audited_df["buybacks_shares"]
+    buyback_shares = buyback_shares_raw / 1e6 if amount_unit == "million" else buyback_shares_raw
     buyback_paid = audited_df["buybacks_paid"]
 
     audited_df["Buyback_Price_Share"] = np.where(

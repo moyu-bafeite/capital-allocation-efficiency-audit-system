@@ -25,7 +25,8 @@ def render_summary(data: CompanyAuditInput, scorecard: dict) -> None:
     with col_meta2:
         st.metric("统计年限", f"{data.years[0]}-{data.years[-1]} ({len(data.years)})")
     with col_meta3:
-        st.metric("财报币种 / 金额单位", f"{data.currency} / {data.amount_unit}", f"市场币种: {data.market_currency}")
+        display_unit = "元（原始值）" if data.amount_unit == "absolute" else data.amount_unit
+        st.metric("财报币种 / 金额单位", f"{data.currency} / {display_unit}", f"市场币种: {data.market_currency}")
     with col_meta4:
         st.metric("审计综合等级", f"🏆 {scorecard['grade']}", f"得分: {scorecard['composite_score']}/100")
     st.markdown("---")
@@ -140,7 +141,7 @@ def render_buyback_section(data: CompanyAuditInput, result: AuditResult) -> None
         [
             "dividends_paid_market_currency",
             "buybacks_paid_market_currency",
-            "buybacks_shares_m",
+            "buybacks_shares",
             "Buyback_Price_Share_Market_Currency",
             "Intrinsic_Value_Share_Market_Currency",
             "Buyback_to_Intrinsic_Ratio",
@@ -150,7 +151,7 @@ def render_buyback_section(data: CompanyAuditInput, result: AuditResult) -> None
     audit_display_df.columns = [
         f"现金派息总额（{data.market_currency}）",
         f"回购现金支出（{data.market_currency}）",
-        "回购股份数量（百万股）",
+        "回购股份数量（股）",
         f"实际回购均价（{data.market_currency}）",
         f"每股估算内在价值（{data.market_currency}）",
         "回购均价 / 内在价值",
@@ -162,7 +163,7 @@ def render_buyback_section(data: CompanyAuditInput, result: AuditResult) -> None
             {
                 f"现金派息总额（{data.market_currency}）": "{:,.2f}",
                 f"回购现金支出（{data.market_currency}）": "{:,.2f}",
-                "回购股份数量（百万股）": "{:,.2f}",
+                "回购股份数量（股）": "{:,.0f}",
                 f"实际回购均价（{data.market_currency}）": "{:,.2f}",
                 f"每股估算内在价值（{data.market_currency}）": "{:,.2f}",
                 "回购均价 / 内在价值": "{:.2%}",
@@ -223,8 +224,89 @@ def render_ledger_section(data: CompanyAuditInput, result: AuditResult) -> None:
         mime="text/csv",
     )
 
+    st.markdown("---")
+    st.markdown("#### 🔌 本地 DuckDB 缓存数据库实时诊断 (DuckDB SQL Diagnostics)")
+    st.markdown(
+        "本系统采用高能进程内 SQL 数据库 **DuckDB** 存储和管理从 API 抓取的数据。"
+        "您可以在下方选择常用的诊断 SQL，或者直接编写自定义 SQL，实时检索并审查本地 DuckDB 缓存内容："
+    )
+
+    try:
+        import duckdb
+        from data.cache import DB_PATH
+        import os
+
+        if os.path.exists(DB_PATH):
+            col_sql1, col_sql2 = st.columns([1, 3])
+            with col_sql1:
+                sql_template = st.selectbox(
+                    "选择常用 SQL 模板",
+                    [
+                        "查看最新 10 条财务底表数据",
+                        "查看缓存的汇率底表数据",
+                        "查看缓存的股价底表数据",
+                        "查看所有成功缓存过的股票输入记录",
+                        "编写自定义 SQL 语句"
+                    ]
+                )
+
+            sql_query = "SELECT * FROM raw_financials LIMIT 10;"
+            if sql_template == "查看最新 10 条财务底表数据":
+                sql_query = "SELECT * FROM raw_financials ORDER BY fetched_at DESC LIMIT 10;"
+            elif sql_template == "查看缓存的汇率底表数据":
+                sql_query = "SELECT * FROM exchange_rates ORDER BY fetched_at DESC;"
+            elif sql_template == "查看缓存的股价底表数据":
+                sql_query = "SELECT * FROM stock_prices ORDER BY fetched_at DESC;"
+            elif sql_template == "查看所有成功缓存过的股票输入记录":
+                sql_query = "SELECT ticker, provider, fetched_at FROM audit_inputs ORDER BY fetched_at DESC;"
+            else:
+                sql_query = ""
+
+            with col_sql2:
+                custom_sql = st.text_area("SQL 编辑器", value=sql_query, height=100, placeholder="例如: SELECT * FROM raw_financials WHERE ticker = '0700.HK';")
+            
+            if custom_sql.strip():
+                try:
+                    with duckdb.connect(DB_PATH, read_only=True) as conn:
+                        df_res = conn.execute(custom_sql).df()
+                    st.success("🎉 SQL 执行成功！")
+                    st.dataframe(df_res, use_container_width=True)
+                except Exception as query_exc:
+                    st.error(f"❌ SQL 执行失败: {query_exc}")
+        else:
+            st.info("💡 缓存数据库 `audit_cache.db` 尚未建立。请从左侧通过 Yahoo 或 Futu 接口拉取并分析任意港股实时数据以进行初始化。")
+    except Exception as exc:
+        st.error(f"无法初始化 DuckDB 诊断工具: {exc}")
+
 
 def render_selected_section(section: str, data: CompanyAuditInput, params: AuditParams, result: AuditResult) -> None:
+    # If the database contains absolute values, we scale a copy of the results to 'million'口径 for all UI presentation logic!
+    if data.amount_unit == "absolute":
+        import dataclasses
+        import copy
+
+        scaled_df = result.audited_df.copy()
+        fields_to_scale = [
+            "net_profit", "ebit", "interest_expense", "total_equity", 
+            "short_term_debt", "long_term_debt", "cash_and_equivalents", 
+            "operating_cash_flow", "capex", "da", "dividends_paid", 
+            "buybacks_paid", "ma_paid", "goodwill", "shares_outstanding", 
+            "buybacks_shares", "Market_Cap", "Owner_Earnings", 
+            "maintenance_capex", "total_debt", "Invested_Capital", 
+            "Retained_Earnings_Annual"
+        ]
+        for f in fields_to_scale:
+            if f in scaled_df.columns:
+                scaled_df[f] = scaled_df[f] / 1e6
+                
+        scaled_calc = copy.copy(result.calculator)
+        scaled_calc.df = scaled_calc.df.copy()
+        for f in fields_to_scale:
+            if f in scaled_calc.df.columns:
+                scaled_calc.df[f] = scaled_calc.df[f] / 1e6
+                
+        result = dataclasses.replace(result, audited_df=scaled_df, calculator=scaled_calc)
+
     if section == SECTION_CAPITAL_ALLOCATION:
         render_capital_allocation_section(data, result)
     elif section == SECTION_ROIC_ROIIC:

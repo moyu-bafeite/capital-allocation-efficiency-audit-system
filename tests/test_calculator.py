@@ -27,10 +27,10 @@ def make_sample_input() -> CompanyAuditInput:
             "da": [20, 20, 20, 20, 20, 20],
             "dividends_paid": [20, 20, 20, 20, 20, 20],
             "buybacks_paid": [0, 0, 10, 0, 20, 0],
-            "buybacks_shares_m": [0, 0, 1, 0, 2, 0],
+            "buybacks_shares": [0, 0, 1000000, 0, 2000000, 0],
             "ma_paid": [5, 5, 5, 5, 5, 5],
             "goodwill": [10, 10, 10, 10, 10, 10],
-            "shares_outstanding_m": [100, 99, 98, 97, 96, 95],
+            "shares_outstanding": [100000000, 99000000, 98000000, 97000000, 96000000, 95000000],
             "avg_stock_price": [10, 11, 12, 13, 14, 15],
         },
     )

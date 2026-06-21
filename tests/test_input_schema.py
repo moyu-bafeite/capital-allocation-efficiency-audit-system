@@ -19,7 +19,7 @@ class InputSchemaTest(unittest.TestCase):
     def test_buyback_paid_requires_buyback_shares(self):
         raw = make_sample_input().model_dump()
         raw["financials"]["buybacks_paid"][2] = 10
-        raw["financials"]["buybacks_shares_m"][2] = 0
+        raw["financials"]["buybacks_shares"][2] = 0
 
         with self.assertRaises(ValueError):
             CompanyAuditInput(**raw)

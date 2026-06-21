@@ -59,8 +59,9 @@ def run_audit(data: CompanyAuditInput, params: AuditParams) -> AuditResult:
         growth_stage_2=params.growth_stage_2,
         stage_2_years=params.stage_2_years,
         terminal_growth=params.terminal_growth,
+        amount_unit=data.amount_unit,
     )
-    audited_df = audit_buybacks(audited_df)
+    audited_df = audit_buybacks(audited_df, amount_unit=data.amount_unit)
     scorecard = generate_scorecard(audited_df)
     commentary = generate_commentary(audited_df, scorecard)
 

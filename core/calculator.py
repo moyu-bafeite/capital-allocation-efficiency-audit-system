@@ -52,11 +52,15 @@ class FinancialCalculator:
         self.df["maintenance_capex"] = maintenance_capex
         self.df["Owner_Earnings"] = self.df["net_profit"] + self.df["da"] - maintenance_capex
 
-        # 5. Market Capitalization, converted to the reporting currency.
+        # 5. Market Capitalization, converted to the reporting currency and matched to amount_unit.
         self.df["avg_stock_price_reporting_currency"] = (
             self.df["avg_stock_price"] * self.df["exchange_rate_to_reporting_currency"]
         )
-        self.df["Market_Cap"] = self.df["shares_outstanding_m"] * self.df["avg_stock_price_reporting_currency"]
+        raw_market_cap = self.df["shares_outstanding"] * self.df["avg_stock_price_reporting_currency"]
+        if self.data.amount_unit == "million":
+            self.df["Market_Cap"] = raw_market_cap / 1e6
+        else:
+            self.df["Market_Cap"] = raw_market_cap
 
         # 6. Retained Earnings
         # Retained Earnings = Net Profit - Dividends - Buybacks

@@ -1,11 +1,9 @@
 import json
 from typing import Tuple
-
 import streamlit as st
-
 from models.input_schema import CompanyAuditInput
 from services.audit_pipeline import AuditParams
-
+from data.manager import DataManager
 
 def get_empty_template() -> str:
     template = {
@@ -30,46 +28,14 @@ def get_empty_template() -> str:
             "da": [40.0, 45.0, 50.0, 55.0, 60.0],
             "dividends_paid": [30.0, 40.0, 50.0, 50.0, 60.0],
             "buybacks_paid": [0.0, 0.0, 10.0, 15.0, 30.0],
-            "buybacks_shares_m": [0.0, 0.0, 2.0, 3.5, 6.0],
+            "buybacks_shares": [0.0, 0.0, 2000000.0, 3500000.0, 6000000.0],
             "ma_paid": [10.0, 20.0, 0.0, 30.0, 15.0],
             "goodwill": [100.0, 115.0, 115.0, 140.0, 150.0],
-            "shares_outstanding_m": [100.0, 100.0, 98.0, 94.5, 88.5],
+            "shares_outstanding": [100000000.0, 100000000.0, 98000000.0, 94500000.0, 88500000.0],
             "avg_stock_price": [10.0, 12.0, 9.0, 8.0, 11.0],
         },
     }
     return json.dumps(template, indent=2, ensure_ascii=False)
-
-
-def _load_raw_data() -> dict | None:
-    st.sidebar.header("📁 数据源选择 & 载入")
-    data_source_opt = st.sidebar.selectbox(
-        "选择审计标的",
-        ["腾讯控股 (00700.HK)", "上传自定义 JSON 数据文件"],
-    )
-
-    if data_source_opt == "腾讯控股 (00700.HK)":
-        try:
-            with open("data/tencent_demo.json", "r", encoding="utf-8") as file:
-                raw_data = json.load(file)
-            st.sidebar.success("成功载入【腾讯控股 (0700.HK)】历史财报数据。")
-            return raw_data
-        except Exception as exc:
-            st.sidebar.error(f"Demo 数据载入失败: {exc}")
-            return None
-
-    uploaded_file = st.sidebar.file_uploader("上传结构化 JSON 财报文件", type=["json"])
-    if uploaded_file is None:
-        st.sidebar.info("请在上方拖入 JSON 财报文件。")
-        return None
-
-    try:
-        raw_data = json.load(uploaded_file)
-        st.sidebar.success("上传成功！")
-        return raw_data
-    except Exception as exc:
-        st.sidebar.error(f"解析 JSON 失败: {exc}")
-        return None
-
 
 def _render_toolbox() -> None:
     st.sidebar.markdown("---")
@@ -80,19 +46,6 @@ def _render_toolbox() -> None:
         file_name="capital_allocation_template.json",
         mime="application/json",
     )
-
-
-def _parse_input(raw_data: dict | None) -> CompanyAuditInput:
-    if raw_data is None:
-        st.info("💡 请在侧边栏选择腾讯 Demo 数据或上传自定义 JSON 数据启动系统。")
-        st.stop()
-
-    try:
-        return CompanyAuditInput(**raw_data)
-    except Exception as exc:
-        st.error(f"❌ 数据结构校验失败，请检查字段格式。详细错误: {exc}")
-        st.stop()
-
 
 def _render_params(data: CompanyAuditInput) -> AuditParams:
     st.sidebar.markdown("---")
@@ -192,10 +145,99 @@ def _render_params(data: CompanyAuditInput) -> AuditParams:
         terminal_growth=terminal_growth,
     )
 
-
 def render_sidebar() -> Tuple[CompanyAuditInput, AuditParams]:
-    raw_data = _load_raw_data()
+    st.sidebar.header("📁 数据源选择 & 载入")
+    data_source_opt = st.sidebar.selectbox(
+        "选择审计标的",
+        [
+            "从 富途牛牛 (Futu OpenD) 实时拉取",
+            "从 雅虎财经 (Yahoo Finance) 实时拉取",
+            "上传自定义 JSON 数据文件"
+        ],
+    )
+
+    # Initialize variables
+    data_obj = None
+
+    # Handle source selection
+    if data_source_opt == "上传自定义 JSON 数据文件":
+        uploaded_file = st.sidebar.file_uploader("上传结构化 JSON 财报文件", type=["json"])
+        if uploaded_file is not None:
+            try:
+                raw_data = json.load(uploaded_file)
+                data_obj = CompanyAuditInput(**raw_data)
+                st.sidebar.success("上传成功！")
+            except Exception as exc:
+                st.sidebar.error(f"解析/校验 JSON 失败: {exc}")
+                st.stop()
+        else:
+            st.info("💡 请在侧边栏上传 JSON 财报文件启动审计系统。")
+            st.stop()
+
+    else:
+        # Live APIs (Yahoo or Futu)
+        is_yahoo = "Yahoo" in data_source_opt
+        provider_name = "yahoo" if is_yahoo else "futu"
+        default_ticker = "0700.HK" if is_yahoo else "HK.00700"
+
+        ticker_input = st.sidebar.text_input("输入港股代码", value=default_ticker, help="例如: 0700.HK, 9988.HK 或 HK.00700").strip()
+        
+        # Years Slider selection
+        years_range = st.sidebar.slider(
+            "选择财报审计年份区间",
+            min_value=2010,
+            max_value=2025,
+            value=(2016, 2025),
+            step=1
+        )
+        years_list = list(range(years_range[0], years_range[1] + 1))
+        
+        force_refresh = st.sidebar.checkbox("强制刷新本地数据库缓存", value=False)
+        fetch_btn = st.sidebar.button("🔍 开始实时拉取并审计")
+
+        # Create source signature key
+        source_key = f"{ticker_input}_{provider_name}_{years_range[0]}_{years_range[1]}"
+
+        # 1. Memory/Session Cache check
+        if not force_refresh and "cached_input_data" in st.session_state and st.session_state.get("cached_source_key") == source_key:
+            data_obj = st.session_state["cached_input_data"]
+        else:
+            # 2. DuckDB Disk Cache check
+            manager = DataManager()
+            cached_dict = None
+            if not force_refresh:
+                cached_dict = manager.cache.get_audit_input(ticker_input, provider_name)
+                
+            if cached_dict and set(years_list).issubset(set(cached_dict.get("years", []))):
+                try:
+                    data_obj = CompanyAuditInput(**cached_dict)
+                    st.session_state["cached_input_data"] = data_obj
+                    st.session_state["cached_source_key"] = source_key
+                    st.sidebar.success(f"成功从本地 DuckDB 缓存载入 {ticker_input}。")
+                except Exception:
+                    cached_dict = None
+
+            # 3. Pull fresh from API if cache misses or refresh is requested
+            if data_obj is None:
+                if fetch_btn:
+                    try:
+                        with st.spinner("正在从 API 抓取财报并保存到本地 DuckDB..."):
+                            data_obj = manager.get_audit_input(
+                                ticker=ticker_input,
+                                provider_name=provider_name,
+                                years=years_list,
+                                refresh=True
+                            )
+                        st.session_state["cached_input_data"] = data_obj
+                        st.session_state["cached_source_key"] = source_key
+                        st.sidebar.success(f"成功获取 {ticker_input} 数据并缓存至本地！")
+                    except Exception as exc:
+                        st.sidebar.error(f"数据抓取/标准化失败：{exc}")
+                        st.stop()
+                else:
+                    st.info("💡 缓存未命中。请点击【开始实时拉取并审计】按钮以从 API 抓取并加载。")
+                    st.stop()
+
     _render_toolbox()
-    data = _parse_input(raw_data)
-    params = _render_params(data)
-    return data, params
+    params = _render_params(data_obj)
+    return data_obj, params
