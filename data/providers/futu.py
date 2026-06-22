@@ -251,17 +251,18 @@ class FutuOpenDProvider(BaseProvider):
             eps_val = mapped["eps"][idx]
 
             # Insurance 1: Try to compute using Net Profit / EPS (highly precise average shares outstanding)
-            if eps_val > 0 and np_val > 0:
-                mapped["shares_outstanding"][idx] = int(round(np_val / eps_val))
+            if eps_val != 0:
+                mapped["shares_outstanding"][idx] = abs(int(round(np_val / eps_val)))
 
-        # Insurance 2: Fallback to basic default value if still missing
-        for idx in range(len(years)):
+        # Validation: Fail fast if shares_outstanding is missing or invalid
+        for idx, year in enumerate(years):
             if mapped["shares_outstanding"][idx] <= 0:
-                # 100 million shares as a default
-                mapped["shares_outstanding"][idx] = int(100.0 * 1e6)
-            else:
-                # Ensure all are stored as integers
-                mapped["shares_outstanding"][idx] = int(round(mapped["shares_outstanding"][idx]))
+                raise ValueError(
+                    f"Failed to retrieve or calculate valid shares_outstanding in year {year}. "
+                    f"Please verify the financial reports."
+                )
+            # Ensure all are stored as integers
+            mapped["shares_outstanding"][idx] = int(round(mapped["shares_outstanding"][idx]))
 
         mapped["tax_rate"] = tax_rates
 
