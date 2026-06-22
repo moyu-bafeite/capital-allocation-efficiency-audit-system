@@ -37,48 +37,63 @@ def generate_scorecard(df: pd.DataFrame, custom_weights: Dict[str, float] = None
     avg_roic = df["ROIC"].tail(5).mean()
     if pd.isna(avg_roic):
         roic_score = 80.0
-    elif avg_roic >= 0.20:
-        roic_score = 100.0
-    elif avg_roic >= 0.15:
-        roic_score = 90.0
-    elif avg_roic >= 0.10:
-        roic_score = 75.0
-    elif avg_roic >= 0.05:
-        roic_score = 60.0
     else:
-        roic_score = 40.0
+        # ROIC interpolation:
+        # <= 0.00 -> 40.0
+        #    0.05 -> 60.0
+        #    0.10 -> 75.0
+        #    0.15 -> 90.0
+        # >= 0.20 -> 100.0
+        roic_score = np.interp(
+            avg_roic,
+            [0.00, 0.05, 0.10, 0.15, 0.20],
+            [40.0, 60.0, 75.0, 90.0, 100.0]
+        )
 
     roiic_window, roiic_col, latest_roiic = _latest_longest_window_value(df, "ROIIC_Retained_")
     if pd.isna(latest_roiic):
         roiic_score = 75.0
-    elif latest_roiic >= 0.20:
-        roiic_score = 100.0
-    elif latest_roiic >= 0.15:
-        roiic_score = 90.0
-    elif latest_roiic >= 0.10:
-        roiic_score = 75.0
-    elif latest_roiic >= 0.05:
-        roiic_score = 60.0
     else:
-        roiic_score = 40.0
+        # ROIIC interpolation:
+        # <= 0.00 -> 40.0
+        #    0.05 -> 60.0
+        #    0.10 -> 75.0
+        #    0.15 -> 90.0
+        # >= 0.20 -> 100.0
+        roiic_score = np.interp(
+            latest_roiic,
+            [0.00, 0.05, 0.10, 0.15, 0.20],
+            [40.0, 60.0, 75.0, 90.0, 100.0]
+        )
 
     one_dollar_window, one_dollar_col, latest_one_dollar = _latest_longest_window_value(
         df, "One_Dollar_Rule_"
     )
     if pd.isna(latest_one_dollar):
         one_dollar_score = 75.0
-    elif latest_one_dollar >= 1.5:
-        one_dollar_score = 100.0
-    elif latest_one_dollar >= 1.0:
-        one_dollar_score = 80.0
-    elif latest_one_dollar >= 0.5:
-        one_dollar_score = 60.0
     else:
-        one_dollar_score = 30.0
+        # One Dollar Rule interpolation:
+        # <= 0.00 -> 30.0
+        #    0.50 -> 60.0
+        #    1.00 -> 80.0
+        # >= 1.50 -> 100.0
+        one_dollar_score = np.interp(
+            latest_one_dollar,
+            [0.00, 0.50, 1.00, 1.50],
+            [30.0, 60.0, 80.0, 100.0]
+        )
 
     buyback_ratios = df["Buyback_to_Intrinsic_Ratio"].dropna()
     if buyback_ratios.empty:
-        buyback_score = 80.0
+        # Check if the stock was ever overvalued (stock price > 1.15 * intrinsic value)
+        # while they had zero buybacks (virtue of restraint!)
+        is_overvalued = False
+        if "avg_stock_price_reporting_currency" in df.columns and "Intrinsic_Value_Share" in df.columns:
+            overval_mask = (df["avg_stock_price_reporting_currency"] > df["Intrinsic_Value_Share"] * 1.15)
+            if overval_mask.any():
+                is_overvalued = True
+        
+        buyback_score = 95.0 if is_overvalued else 80.0
         avg_buyback_ratio = np.nan
     else:
         buyback_weights = df.loc[buyback_ratios.index, "buybacks_paid"].clip(lower=0)
@@ -87,16 +102,17 @@ def generate_scorecard(df: pd.DataFrame, custom_weights: Dict[str, float] = None
         else:
             avg_buyback_ratio = buyback_ratios.mean()
 
-        if avg_buyback_ratio <= 0.80:
-            buyback_score = 100.0
-        elif avg_buyback_ratio <= 1.00:
-            buyback_score = 90.0
-        elif avg_buyback_ratio <= 1.15:
-            buyback_score = 70.0
-        elif avg_buyback_ratio <= 1.30:
-            buyback_score = 50.0
-        else:
-            buyback_score = 30.0
+        # Continuous linear interpolation for buyback score:
+        # ratio <= 0.80 -> 100.0
+        # ratio == 1.00 -> 90.0
+        # ratio == 1.15 -> 70.0
+        # ratio == 1.30 -> 50.0
+        # ratio >= 1.50 -> 30.0
+        buyback_score = np.interp(
+            avg_buyback_ratio,
+            [0.80, 1.00, 1.15, 1.30, 1.50],
+            [100.0, 90.0, 70.0, 50.0, 30.0]
+        )
 
     total_payout = df["dividends_paid"].sum() + df["buybacks_paid"].sum()
     total_owner_earnings = df["Owner_Earnings"].sum() if "Owner_Earnings" in df.columns else df["net_profit"].sum()
@@ -104,31 +120,55 @@ def generate_scorecard(df: pd.DataFrame, custom_weights: Dict[str, float] = None
     payout_ratio = total_payout / total_owner_earnings if total_owner_earnings > 0 else 0.0
     fcf_payout_ratio = total_payout / total_fcf if total_fcf > 0 else np.nan
 
-    if avg_roic < 0.08:
-        if payout_ratio >= 0.75:
-            payout_score = 100.0
-        elif payout_ratio >= 0.60:
-            payout_score = 80.0
-        elif payout_ratio >= 0.40:
-            payout_score = 60.0
-        elif payout_ratio >= 0.20:
-            payout_score = 40.0
-        else:
-            payout_score = 20.0
-    elif payout_ratio >= 0.30:
-        payout_score = 100.0
-    else:
-        payout_score = 85.0
+    # High-efficiency reinvestment protection:
+    # If the company has exceptionally high ROIC (>= 15%) and ROIIC (>= 12%),
+    # retaining 100% of profits is the perfect capital allocation choice.
+    # Therefore, we excuse low payout ratios and give them 100.0 payout score.
+    is_ultra_compounder = (
+        (not pd.isna(avg_roic) and avg_roic >= 0.15) and 
+        (not pd.isna(latest_roiic) and latest_roiic >= 0.12)
+    )
 
+    if is_ultra_compounder:
+        payout_score = 100.0
+    # Negative earnings protection:
+    # If Owner Earnings <= 0, the company has no capacity to pay dividends.
+    # - Zero payout is the prudent cash-conservation choice -> 100.0
+    # - Forcing payouts while losing money destroys value -> 40.0
+    elif total_owner_earnings <= 0:
+        payout_score = 100.0 if total_payout == 0 else 40.0
+    # Low ROIC companies (< 8%) should return capital to shareholders.
+    # Smooth interpolation: 0% -> 20.0, 75%+ -> 100.0
+    elif avg_roic < 0.08:
+        payout_score = np.interp(
+            payout_ratio,
+            [0.00, 0.20, 0.40, 0.60, 0.75],
+            [20.0, 40.0, 60.0, 80.0, 100.0]
+        )
+    # Normal / high ROIC companies: moderate payout (>= 30%) is ideal.
+    # Smooth interpolation: 0% -> 85.0, 30%+ -> 100.0
+    else:
+        payout_score = np.interp(
+            payout_ratio,
+            [0.00, 0.30],
+            [85.0, 100.0]
+        )
+
+    # Smooth FCF over-allocation penalty (sustainability check):
     if total_payout > 0:
         if total_owner_earnings <= 0:
             payout_score = min(payout_score, 40.0)
-        elif pd.isna(fcf_payout_ratio):
-            payout_score = min(payout_score, 55.0)
-        elif fcf_payout_ratio > 1.25:
+        elif pd.isna(fcf_payout_ratio) or total_fcf <= 0:
+            # Negative FCF while paying dividends is unsustainable
             payout_score = min(payout_score, 55.0)
         elif fcf_payout_ratio > 1.0:
-            payout_score = min(payout_score, 70.0)
+            # Smooth cap: 1.0 -> 70.0, 1.25 -> 55.0, > 1.25 -> 55.0
+            cap_val = np.interp(
+                fcf_payout_ratio,
+                [1.00, 1.25],
+                [70.0, 55.0]
+            )
+            payout_score = min(payout_score, cap_val)
 
     composite_score = (
         roic_score * weights["roic"]

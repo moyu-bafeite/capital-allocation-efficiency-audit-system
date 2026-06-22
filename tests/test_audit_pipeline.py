@@ -71,7 +71,7 @@ class AuditModulesTest(unittest.TestCase):
 
         scorecard = generate_scorecard(df)
         self.assertEqual(scorecard["roiic_col"], "ROIIC_Retained_5Y")
-        self.assertEqual(scorecard["roiic_score"], 60.0)
+        self.assertAlmostEqual(scorecard["roiic_score"], 63.0)
 
     def test_pipeline_returns_complete_audited_dataframe(self):
         result = run_audit(
