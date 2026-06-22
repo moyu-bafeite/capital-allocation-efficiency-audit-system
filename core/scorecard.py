@@ -33,7 +33,7 @@ def generate_scorecard(df: pd.DataFrame) -> Dict[str, Any]:
     """
     Generate a weighted management capital allocation scorecard.
     """
-    avg_roic = df["ROIC"].mean()
+    avg_roic = df["ROIC"].tail(5).mean()
     if pd.isna(avg_roic):
         roic_score = 80.0
     elif avg_roic >= 0.20:
