@@ -2,8 +2,6 @@ import streamlit as st
 
 from models.input_schema import CompanyAuditInput
 from services.audit_pipeline import AuditParams, AuditResult
-from core.scorecard import generate_scorecard, SCORE_WEIGHTS
-from core.commentary import generate_commentary
 from ui.charts import (
     create_allocation_pie_chart,
     create_buyback_chart,
@@ -15,22 +13,20 @@ from ui.charts import (
 SECTION_CAPITAL_ALLOCATION = "📊 累计资本分配流向 (Cumulative Capital Allocation / Sources & Uses)"
 SECTION_ROIC_ROIIC = "🚀 存量与增量资本配置回报率 (ROIC & ROIIC Capital Efficiency)"
 SECTION_BUYBACK = "🎁 股份回购与红利分配 (Share Repurchase & Dividend Efficacy)"
-SECTION_SCORECARD = "🏆 资本配置能力综合量化评分 (Capital Allocation Scorecard)"
+SECTION_CHECKLIST = "✅ 资本配置原则清单 (Capital Allocation Principles Checklist)"
 SECTION_LEDGER = "📋 财务数据标准化原始审计底表 (Standardized Financial Indicator Ledger)"
-SECTIONS = [SECTION_CAPITAL_ALLOCATION, SECTION_ROIC_ROIIC, SECTION_BUYBACK, SECTION_SCORECARD, SECTION_LEDGER]
+SECTIONS = [SECTION_CAPITAL_ALLOCATION, SECTION_ROIC_ROIIC, SECTION_BUYBACK, SECTION_CHECKLIST, SECTION_LEDGER]
 
 
-def render_summary(data: CompanyAuditInput, scorecard: dict) -> None:
-    col_meta1, col_meta2, col_meta3, col_meta4 = st.columns(4)
+def render_summary(data: CompanyAuditInput, checklist: dict) -> None:
+    col_meta1, col_meta2, col_meta3 = st.columns(3)
     with col_meta1:
         st.metric("标的名称 / 代码", f"{data.company_name} / {data.ticker}")
     with col_meta2:
         st.metric("统计年限", f"{data.years[0]}-{data.years[-1]} ({len(data.years)})")
     with col_meta3:
-        display_unit = "元（原始值）" if data.amount_unit == "absolute" else data.amount_unit
+        display_unit = "元" if data.amount_unit == "absolute" else data.amount_unit
         st.metric("财报币种 / 金额单位", f"{data.currency} / {display_unit}", f"市场币种: {data.market_currency}")
-    with col_meta4:
-        st.metric("审计综合等级", f"🏆 {scorecard['grade']}", f"得分: {scorecard['composite_score']}/100")
     st.markdown("---")
 
 
@@ -187,79 +183,49 @@ def render_buyback_section(data: CompanyAuditInput, result: AuditResult) -> None
     )
 
 
-def render_scorecard_section(result: AuditResult) -> None:
-    st.markdown("#### 🏆 资本配置能力综合量化评分 (Capital Allocation Scorecard)")
-    st.markdown("结合定量算法，对增量再投资能力、一美元创造效率、回购纪律及股东派息慷慨度进行多维度加权打分：")
+def render_checklist_section(result: AuditResult) -> None:
+    st.markdown("#### ✅ 资本配置原则清单 (Capital Allocation Principles Checklist)")
+    st.markdown(
+        "以下六条原则基于巴菲特式的资本配置检查清单，"
+        "每条原则展示**客观事实数据**与**基准对比**，由系统自动计算判定状态。"
+        "用户应结合行业特性与公司生命周期阶段，对未通过或警告的原则进行深入研究。"
+    )
 
-    # Interactive Weights Customization UI
-    with st.expander("⚙️ 自定义评价权重 (Customize Scorecard Weights)", expanded=False):
-        st.caption("拖动滑块或输入数值调整各维度在总分中的占比。确保所有权重加起来等于 100%。")
-        
-        if "persist_w_roic" not in st.session_state:
-            st.session_state.persist_w_roic = SCORE_WEIGHTS["roic"]
-            st.session_state.persist_w_roiic = SCORE_WEIGHTS["roiic"]
-            st.session_state.persist_w_1d = SCORE_WEIGHTS["one_dollar"]
-            st.session_state.persist_w_buyback = SCORE_WEIGHTS["buyback"]
-            st.session_state.persist_w_payout = SCORE_WEIGHTS["payout"]
+    checklist = result.checklist
+    principles = checklist["principles"]
 
-        col_w1, col_w2, col_w3, col_w4, col_w5 = st.columns(5)
-        
-        with col_w1:
-            w_roic = st.number_input("存量资产创利 (ROIC)", min_value=0.0, max_value=1.0, value=st.session_state.persist_w_roic, key="temp_weight_roic", step=0.05, format="%.2f")
-        with col_w2:
-            w_roiic = st.number_input("增量利润开拓 (ROIIC)", min_value=0.0, max_value=1.0, value=st.session_state.persist_w_roiic, key="temp_weight_roiic", step=0.05, format="%.2f")
-        with col_w3:
-            w_1d = st.number_input("市场市值创造 ($1 Rule)", min_value=0.0, max_value=1.0, value=st.session_state.persist_w_1d, key="temp_weight_one_dollar", step=0.05, format="%.2f")
-        with col_w4:
-            w_buyback = st.number_input("回购折价溢价 (Buyback)", min_value=0.0, max_value=1.0, value=st.session_state.persist_w_buyback, key="temp_weight_buyback", step=0.05, format="%.2f")
-        with col_w5:
-            w_payout = st.number_input("现金回报适配 (Payout)", min_value=0.0, max_value=1.0, value=st.session_state.persist_w_payout, key="temp_weight_payout", step=0.05, format="%.2f")
-            
-        # Update persistent shadow variables to survive tab switching unmounts
-        st.session_state.persist_w_roic = w_roic
-        st.session_state.persist_w_roiic = w_roiic
-        st.session_state.persist_w_1d = w_1d
-        st.session_state.persist_w_buyback = w_buyback
-        st.session_state.persist_w_payout = w_payout
+    status_config = {
+        "pass": {"icon": "✅", "color": "#00ffcc"},
+        "fail": {"icon": "❌", "color": "#ff4d4d"},
+        "warning": {"icon": "⚠️", "color": "#f59e0b"},
+        "insufficient_data": {"icon": "❓", "color": "#8892b0"},
+    }
 
-        custom_weights = {
-            "roic": w_roic,
-            "roiic": w_roiic,
-            "one_dollar": w_1d,
-            "buyback": w_buyback,
-            "payout": w_payout
-        }
-        
-        total_weight = sum(custom_weights.values())
-        if abs(total_weight - 1.0) > 0.001:
-            st.warning(f"⚠️ 注意：当前总权重为 {total_weight:.0%}，建议将其调整至 100%。")
-
-    # Real-time recalculation based on interactive weights
-    scorecard = generate_scorecard(result.audited_df, custom_weights)
-    dynamic_commentary = generate_commentary(result.audited_df, scorecard)
-
-    col_score1, col_score2 = st.columns([1, 2])
-    with col_score1:
+    for p in principles:
+        cfg = status_config.get(p["status"], status_config["insufficient_data"])
         st.markdown(
             f"""
-            <div style="background-color: #171923; padding: 2rem; border-radius: 1rem; border: 2px solid #00ffcc; text-align: center;">
-                <p style="font-size: 1.2rem; color: #8892b0; margin-bottom: 0.5rem;">期末审计评级</p>
-                <p style="font-size: 5.5rem; font-weight: 900; color: #00ffcc; margin: 0; line-height: 1;">{scorecard['grade']}</p>
-                <p style="font-size: 1.5rem; color: #ffffff; margin-top: 1rem; font-weight: bold;">综合分： {scorecard['composite_score']}/100</p>
+            <div style="background-color: #171923; padding: 1.5rem; border-radius: 0.8rem; border-left: 4px solid {cfg['color']}; margin-bottom: 1rem;">
+                <p style="font-size: 1.1rem; font-weight: 700; color: {cfg['color']}; margin: 0 0 0.5rem 0;">
+                    {cfg['icon']} 原则 {p['index']}：{p['title']}
+                </p>
+                <p style="font-size: 0.95rem; color: #ffffff; margin: 0.25rem 0;">
+                    <span style="color: #8892b0;">实际值：</span><strong>{p['value']}</strong>
+                    &nbsp;&nbsp;
+                    <span style="color: #8892b0;">基准：</span><strong>{p['benchmark']}</strong>
+                </p>
+                <p style="font-size: 0.9rem; color: #b0b8cc; margin: 0.5rem 0 0 0;">{p['description']}</p>
             </div>
             """,
             unsafe_allow_html=True,
         )
-        st.markdown("-----")
-        st.markdown("###### 📐 五维权重分值细目")
-        st.markdown(f"- 存量资产创利 ({w_roic:.0%})：**{scorecard['roic_score']:.0f}**")
-        st.markdown(f"- 增量利润开拓 ({w_roiic:.0%})：**{scorecard['roiic_score']:.0f}**")
-        st.markdown(f"- 市场市值创造 ({w_1d:.0%})：**{scorecard['one_dollar_score']:.0f}**")
-        st.markdown(f"- 回购折价溢价 ({w_buyback:.0%})：**{scorecard['buyback_score']:.0f}**")
-        st.markdown(f"- 现金回报适配 ({w_payout:.0%})：**{scorecard['payout_score']:.0f}**")
 
-    with col_score2:
-        st.markdown(dynamic_commentary)
+    st.markdown("---")
+    st.info(
+        f"📊 **汇总**：{checklist['summary']}。"
+        f"本清单提供事实数据和客观判定，不构成投资建议。"
+        f"请结合行业基准、竞争格局和管理层历史决策背景进行独立判断。"
+    )
 
 
 def render_ledger_section(data: CompanyAuditInput, result: AuditResult) -> None:
@@ -375,7 +341,7 @@ def render_selected_section(section: str, data: CompanyAuditInput, params: Audit
         render_roic_roiic_section(params, result)
     elif section == SECTION_BUYBACK:
         render_buyback_section(data, result)
-    elif section == SECTION_SCORECARD:
-        render_scorecard_section(result)
+    elif section == SECTION_CHECKLIST:
+        render_checklist_section(result)
     elif section == SECTION_LEDGER:
         render_ledger_section(data, result)

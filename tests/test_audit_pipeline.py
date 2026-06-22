@@ -3,7 +3,7 @@ import unittest
 import pandas as pd
 
 from core.buyback_audit import audit_buybacks
-from core.scorecard import generate_scorecard
+from core.checklist import generate_checklist
 from core.valuation import calculate_intrinsic_value
 from services.audit_pipeline import AuditParams, run_audit
 from tests.test_calculator import make_sample_input
@@ -52,7 +52,7 @@ class AuditModulesTest(unittest.TestCase):
         self.assertEqual(audited_df.loc[2020, "Buyback_to_Intrinsic_Ratio"], 0.5)
         self.assertIn("卓越", audited_df.loc[2020, "Buyback_Audit_Rating"])
 
-    def test_scorecard_uses_longest_roiic_retained_window(self):
+    def test_checklist_generates_six_principles(self):
         df = pd.DataFrame(
             {
                 "ROIC": [0.15, 0.16],
@@ -69,9 +69,11 @@ class AuditModulesTest(unittest.TestCase):
             }
         )
 
-        scorecard = generate_scorecard(df)
-        self.assertEqual(scorecard["roiic_col"], "ROIIC_Retained_5Y")
-        self.assertAlmostEqual(scorecard["roiic_score"], 63.0)
+        checklist = generate_checklist(df, wacc=0.08)
+        self.assertEqual(len(checklist["principles"]), 6)
+        self.assertEqual(checklist["roiic_col"], "ROIIC_Retained_5Y")
+        self.assertIn("pass_count", checklist)
+        self.assertIn("summary", checklist)
 
     def test_pipeline_returns_complete_audited_dataframe(self):
         result = run_audit(
@@ -90,7 +92,8 @@ class AuditModulesTest(unittest.TestCase):
 
         self.assertIn("Intrinsic_Value_Share", result.audited_df.columns)
         self.assertIn("Buyback_Audit_Rating", result.audited_df.columns)
-        self.assertEqual(result.scorecard["roiic_col"], "ROIIC_Retained_5Y")
+        self.assertEqual(result.checklist["roiic_col"], "ROIIC_Retained_5Y")
+        self.assertEqual(len(result.checklist["principles"]), 6)
 
 
 if __name__ == "__main__":

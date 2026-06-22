@@ -5,8 +5,7 @@ import pandas as pd
 
 from core.buyback_audit import audit_buybacks
 from core.calculator import FinancialCalculator
-from core.commentary import generate_commentary
-from core.scorecard import generate_scorecard
+from core.checklist import generate_checklist
 from core.valuation import calculate_intrinsic_value
 from models.input_schema import CompanyAuditInput
 
@@ -30,8 +29,7 @@ class AuditResult:
     calculator: FinancialCalculator
     processed_df: pd.DataFrame
     audited_df: pd.DataFrame
-    scorecard: Dict[str, Any]
-    commentary: str
+    checklist: Dict[str, Any]
     roiic_retained_col_1: str
     roiic_retained_col_2: str
 
@@ -62,15 +60,18 @@ def run_audit(data: CompanyAuditInput, params: AuditParams) -> AuditResult:
         amount_unit=data.amount_unit,
     )
     audited_df = audit_buybacks(audited_df, amount_unit=data.amount_unit)
-    scorecard = generate_scorecard(audited_df)
-    commentary = generate_commentary(audited_df, scorecard)
+    checklist = generate_checklist(
+        audited_df,
+        wacc=params.wacc,
+        roiic_col=f"ROIIC_Retained_{params.roiic_window_2}Y",
+        one_dollar_col=f"One_Dollar_Rule_{params.roiic_window_2}Y",
+    )
 
     return AuditResult(
         calculator=calculator,
         processed_df=processed_df,
         audited_df=audited_df,
-        scorecard=scorecard,
-        commentary=commentary,
+        checklist=checklist,
         roiic_retained_col_1=f"ROIIC_Retained_{params.roiic_window_1}Y",
         roiic_retained_col_2=f"ROIIC_Retained_{params.roiic_window_2}Y",
     )

@@ -83,7 +83,7 @@ def main() -> None:
         st.error(f"❌ 审计模型运行失败：{exc}")
         st.stop()
 
-    render_summary(data, result.scorecard)
+    render_summary(data, result.checklist)
     selected_section = render_navigation()
     render_selected_section(selected_section, data, params, result)
 

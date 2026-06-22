@@ -3,8 +3,7 @@ from typing import Any, Dict
 import pandas as pd
 
 from core.buyback_audit import audit_buybacks
-from core.commentary import generate_commentary
-from core.scorecard import generate_scorecard
+from core.checklist import generate_checklist
 from core.valuation import calculate_intrinsic_value
 
 
@@ -42,10 +41,7 @@ class ManagementAuditor:
         self.df = audit_buybacks(self.df)
         return self.df
 
-    def generate_scorecard(self) -> Dict[str, Any]:
+    def generate_checklist(self, wacc: float = 0.08) -> Dict[str, Any]:
         if "Buyback_to_Intrinsic_Ratio" not in self.df.columns:
             self.audit_buybacks()
-        return generate_scorecard(self.df)
-
-    def generate_commentary(self, score_dict: Dict[str, Any]) -> str:
-        return generate_commentary(self.df, score_dict)
+        return generate_checklist(self.df, wacc=wacc)
