@@ -74,14 +74,11 @@ def render_capital_allocation_section(data: CompanyAuditInput, result: AuditResu
         st.markdown(f"追踪 **{start_year_selected}-{end_year_selected}** 年累计期间公司通过**经营活动赚取的累计现金流**，审计管理层如何在**资本支出、现金分红、回购股份、投资并购**等渠道间分配资本。")
 
     waterfall_data = result.calculator.get_waterfall_data(start_year_selected, end_year_selected)
-    col_w1, col_w2 = st.columns([2, 1])
-    with col_w1:
-        st.plotly_chart(create_waterfall_chart(waterfall_data, start_year_selected, end_year_selected), use_container_width=True)
-    with col_w2:
-        st.markdown("###### 资本流向构成比率")
-        st.plotly_chart(create_allocation_pie_chart(waterfall_data), use_container_width=True)
+    st.plotly_chart(create_waterfall_chart(waterfall_data, start_year_selected, end_year_selected), use_container_width=True)
+    st.markdown("###### 资本流向构成比率")
+    st.plotly_chart(create_allocation_pie_chart(waterfall_data), use_container_width=True)
 
-    st.markdown("###### 🎯 资本分配率诊断")
+    st.markdown("###### 资本分配率诊断")
     c1, c2, c3, c4 = st.columns(4)
     total_ocf = waterfall_data["Total_Operating_Cash_Flow"]
     with c1:
