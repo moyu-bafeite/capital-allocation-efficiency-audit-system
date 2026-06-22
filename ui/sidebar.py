@@ -10,7 +10,7 @@ def get_empty_template() -> str:
         "ticker": "XXXX.HK",
         "company_name": "示例港股公司",
         "currency": "HKD",
-        "amount_unit": "million",
+        "amount_unit": "absolute",
         "market_currency": "HKD",
         "exchange_rate_to_reporting_currency": [1.0, 1.0, 1.0, 1.0, 1.0],
         "years": [2020, 2021, 2022, 2023, 2024],
@@ -151,7 +151,7 @@ def render_sidebar() -> Tuple[CompanyAuditInput, AuditParams]:
         "选择审计标的",
         [
             "从 富途牛牛 (Futu OpenD) 实时拉取",
-            "从 雅虎财经 (Yahoo Finance) 实时拉取",
+            # "从 雅虎财经 (Yahoo Finance) 实时拉取",
             "上传自定义 JSON 数据文件"
         ],
     )
@@ -232,7 +232,7 @@ def render_sidebar() -> Tuple[CompanyAuditInput, AuditParams]:
                         st.session_state["cached_source_key"] = source_key
                         st.sidebar.success(f"成功获取 {ticker_input} 数据并缓存至本地！")
                     except Exception as exc:
-                        st.sidebar.error(f"数据抓取/标准化失败：{exc}")
+                        st.sidebar.error(f"数据抓取 / 标准化失败：{exc}")
                         st.stop()
                 else:
                     st.info("💡 缓存未命中。请点击【开始实时拉取并审计】按钮以从 API 抓取并加载。")

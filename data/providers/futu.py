@@ -46,12 +46,6 @@ class FutuOpenDProvider(BaseProvider):
                 )
                 if ret == ft.RET_OK and "report_list" in data:
                     raw_reports.extend(data["report_list"])
-            # ret, data = quote_ctx.get_financials_statements(
-            #         futu_symbol, 
-            #         statement_type=0, 
-            #         financial_type=7, 
-            #         num=50
-            #     )
             if ret == ft.RET_OK and "report_list" in data:
                 raw_reports.extend(data["report_list"])
 
@@ -168,7 +162,6 @@ class FutuOpenDProvider(BaseProvider):
             mapped[field] = [0.0] * len(years)
 
         tax_rates = [0.18] * len(years)
-        shares_found = [False] * len(years)
 
         # Build year index
         year_idx = {year: idx for idx, year in enumerate(years)}
@@ -199,11 +192,7 @@ class FutuOpenDProvider(BaseProvider):
                     if display_name in keywords:
                         # Ensure we don't overwrite with less accurate match
                         if mapped[field][idx] == 0.0:
-                            if field == "shares_outstanding":
-                                mapped[field][idx] = val
-                                shares_found[idx] = True
-                            else:
-                                mapped[field][idx] = val
+                            mapped[field][idx] = val
 
             if pretax_profit > 0:
                 tax_rates[idx] = abs(tax_expense / pretax_profit)
@@ -215,18 +204,16 @@ class FutuOpenDProvider(BaseProvider):
 
             # Insurance 1: Try to compute using Net Profit / EPS (highly precise average shares outstanding)
             if eps_val > 0 and np_val > 0:
-                # E.g., 224,842,000,000 (RMB) / 24.749 (RMB/share) = 9,084,892,318 shares
-                mapped["shares_outstanding"][idx] = np_val / eps_val
-                shares_found[idx] = True
-            elif mapped["shares_outstanding"][idx] > 0:
-                # Insurance 2: Fall back to Balance Sheet matched shares_outstanding
-                shares_found[idx] = True
+                mapped["shares_outstanding"][idx] = int(round(np_val / eps_val))
 
-        # Insurance 3: Fallback to basic default value if still missing
-        for idx, found in enumerate(shares_found):
-            if not found or mapped["shares_outstanding"][idx] <= 0:
+        # Insurance 2: Fallback to basic default value if still missing
+        for idx in range(len(years)):
+            if mapped["shares_outstanding"][idx] <= 0:
                 # 100 million shares as a default
-                mapped["shares_outstanding"][idx] = 100.0 * 1e6
+                mapped["shares_outstanding"][idx] = int(100.0 * 1e6)
+            else:
+                # Ensure all are stored as integers
+                mapped["shares_outstanding"][idx] = int(round(mapped["shares_outstanding"][idx]))
 
         mapped["tax_rate"] = tax_rates
 

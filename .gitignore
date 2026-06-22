@@ -61,3 +61,6 @@ outputs/
 *.swo
 .DS_Store
 Thumbs.db
+
+# Cache
+*.db
