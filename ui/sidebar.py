@@ -195,17 +195,20 @@ def render_sidebar() -> Tuple[CompanyAuditInput, AuditParams]:
         force_refresh = st.sidebar.checkbox("强制刷新本地数据库缓存", value=False)
         fetch_btn = st.sidebar.button("🔍 开始实时拉取并审计")
 
+        # Only bypass cache when both force_refresh and fetch_btn is True
+        bypass_cache = force_refresh and fetch_btn
+
         # Create source signature key
         source_key = f"{ticker_input}_{provider_name}_{years_range[0]}_{years_range[1]}"
 
         # 1. Memory/Session Cache check
-        if not force_refresh and "cached_input_data" in st.session_state and st.session_state.get("cached_source_key") == source_key:
+        if not bypass_cache and "cached_input_data" in st.session_state and st.session_state.get("cached_source_key") == source_key:
             data_obj = st.session_state["cached_input_data"]
         else:
             # 2. DuckDB Disk Cache check
             manager = DataManager()
             cached_dict = None
-            if not force_refresh:
+            if not bypass_cache:
                 cached_dict = manager.cache.get_audit_input(ticker_input, provider_name)
                 
             if cached_dict and set(years_list).issubset(set(cached_dict.get("years", []))):
