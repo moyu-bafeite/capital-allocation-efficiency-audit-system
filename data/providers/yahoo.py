@@ -1,7 +1,7 @@
 import yfinance as yf
 import pandas as pd
 import numpy as np
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Tuple
 from data.providers.base import BaseProvider
 
 class YahooFinanceProvider(BaseProvider):
@@ -59,8 +59,8 @@ class YahooFinanceProvider(BaseProvider):
         avg_prices = [p if p > 0 else current_price for p in avg_prices]
         financials["avg_stock_price"] = avg_prices
 
-        # 4. Fetch Exchange Rates
-        exchange_rates = self._fetch_exchange_rates(market_currency, reporting_currency, years)
+        # 4. Fetch Exchange Rates (average and closing)
+        exchange_rates, closing_exchange_rates = self._fetch_exchange_rates(market_currency, reporting_currency, years)
 
         # 5. Get shares outstanding (fallback to current if series is empty)
         shares_series = ticker_obj.get_shares_full(start=f"{min(years)}-01-01", end=f"{max(years)}-12-31")
@@ -105,6 +105,7 @@ class YahooFinanceProvider(BaseProvider):
             "amount_unit": "million",
             "market_currency": market_currency,
             "exchange_rate_to_reporting_currency": exchange_rates,
+            "closing_exchange_rate_to_reporting_currency": closing_exchange_rates,
             "years": years,
             "financials": financials
         }
@@ -208,29 +209,39 @@ class YahooFinanceProvider(BaseProvider):
 
         return mapped
 
-    def _fetch_exchange_rates(self, market_currency: str, reporting_currency: str, years: List[int]) -> List[float]:
-        """Fetches historical exchange rates from Yahoo Finance."""
+    def _fetch_exchange_rates(self, market_currency: str, reporting_currency: str, years: List[int]) -> Tuple[List[float], List[float]]:
+        """Fetches historical exchange rates dynamically from Yahoo Finance to ensure high precision."""
         market_currency = market_currency.upper()
         reporting_currency = reporting_currency.upper()
         if market_currency == reporting_currency:
-            return [1.0] * len(years)
+            return [1.0] * len(years), [1.0] * len(years)
 
-        # Cross currency ticker format in Yahoo is 'HKDCNY=X'
-        cross_symbol = f"{market_currency}{reporting_currency}=X"
+        # Standardize 'RMB' to 'CNY' for Yahoo Finance query
+        std_market = "CNY" if market_currency == "RMB" else market_currency
+        std_reporting = "CNY" if reporting_currency == "RMB" else reporting_currency
+
+        if std_market == std_reporting:
+            return [1.0] * len(years), [1.0] * len(years)
+
+        # Cross currency ticker format in Yahoo is e.g. 'HKDCNY=X'
+        cross_symbol = f"{std_market}{std_reporting}=X"
         try:
             fx_ticker = yf.Ticker(cross_symbol)
             hist = fx_ticker.history(start=f"{min(years)}-01-01", end=f"{max(years)}-12-31")
-            rates = []
+            avg_rates = []
+            closing_rates = []
             if not hist.empty:
                 hist["Year"] = hist.index.year
                 annual_means = hist.groupby("Year")["Close"].mean()
+                annual_closings = hist.groupby("Year")["Close"].last()
                 for year in years:
-                    rates.append(float(annual_means.get(year, 1.0)))
+                    avg_rates.append(float(annual_means.get(year, 1.0)))
+                    closing_rates.append(float(annual_closings.get(year, 1.0)))
             else:
-                rates = [1.0] * len(years)
-            return rates
+                avg_rates = closing_rates = [1.0] * len(years)
+            return avg_rates, closing_rates
         except Exception:
-            # Fallbacks for popular pairs
+            # Fallback for popular pairs if network or API fails
             pair = (market_currency, reporting_currency)
             defaults = {
                 ("HKD", "RMB"): 0.86,
@@ -242,4 +253,4 @@ class YahooFinanceProvider(BaseProvider):
             default_rate = defaults.get(pair) or defaults.get((reporting_currency, market_currency), 1.0)
             if default_rate != 1.0 and defaults.get(pair) is None:
                 default_rate = 1.0 / default_rate
-            return [default_rate] * len(years)
+            return [default_rate] * len(years), [default_rate] * len(years)

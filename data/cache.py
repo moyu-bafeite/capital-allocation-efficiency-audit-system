@@ -41,6 +41,18 @@ class DatabaseCache:
                 )
             """)
 
+            # Table 2b: Historical Closing Exchange Rates
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS closing_exchange_rates (
+                    from_currency VARCHAR,
+                    to_currency VARCHAR,
+                    year INTEGER,
+                    rate DOUBLE,
+                    fetched_at TIMESTAMP,
+                    PRIMARY KEY (from_currency, to_currency, year)
+                )
+            """)
+
             # Table 3: Historical Stock Prices
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS stock_prices (
@@ -117,6 +129,22 @@ class DatabaseCache:
             """, (from_curr, to_curr, int(year))).fetchone()
             return res[0] if res else None
 
+    def save_closing_exchange_rate(self, from_curr: str, to_curr: str, year: int, rate: float):
+        now = datetime.now()
+        with duckdb.connect(self.db_path) as conn:
+            conn.execute("""
+                INSERT OR REPLACE INTO closing_exchange_rates (from_currency, to_currency, year, rate, fetched_at)
+                VALUES (?, ?, ?, ?, ?)
+            """, (from_curr, to_curr, int(year), float(rate), now))
+
+    def get_closing_exchange_rate(self, from_curr: str, to_curr: str, year: int) -> Optional[float]:
+        with duckdb.connect(self.db_path) as conn:
+            res = conn.execute("""
+                SELECT rate FROM closing_exchange_rates 
+                WHERE from_currency = ? AND to_currency = ? AND year = ?
+            """, (from_curr, to_curr, int(year))).fetchone()
+            return res[0] if res else None
+
     def save_stock_price(self, ticker: str, year: int, price: float):
         now = datetime.now()
         with duckdb.connect(self.db_path) as conn:
@@ -152,6 +180,7 @@ class DatabaseCache:
         with duckdb.connect(self.db_path) as conn:
             conn.execute("DELETE FROM raw_financials")
             conn.execute("DELETE FROM exchange_rates")
+            conn.execute("DELETE FROM closing_exchange_rates")
             conn.execute("DELETE FROM stock_prices")
             conn.execute("DELETE FROM audit_inputs")
 

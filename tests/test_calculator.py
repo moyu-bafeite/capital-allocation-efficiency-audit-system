@@ -12,6 +12,7 @@ def make_sample_input() -> CompanyAuditInput:
         amount_unit="million",
         market_currency="USD",
         exchange_rate_to_reporting_currency=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+        closing_exchange_rate_to_reporting_currency=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
         years=[2020, 2021, 2022, 2023, 2024, 2025],
         financials={
             "net_profit": [100, 120, 140, 160, 180, 200],

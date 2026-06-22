@@ -90,5 +90,14 @@ def normalize_audit_data(raw_data: Dict[str, Any]) -> Dict[str, Any]:
                 financials["buybacks_shares"][i] = 0.0
                 financials["buybacks_paid"][i] = 0.0
 
+    # 5. Normalize closing exchange rate (with fallback to average rate)
+    if "closing_exchange_rate_to_reporting_currency" in data:
+        data["closing_exchange_rate_to_reporting_currency"] = [
+            float(v) if (v is not None and v > 0) else 1.0
+            for v in data["closing_exchange_rate_to_reporting_currency"]
+        ]
+    else:
+        data["closing_exchange_rate_to_reporting_currency"] = data.get("exchange_rate_to_reporting_currency", [1.0] * num_years)
+
     data["financials"] = financials
     return data

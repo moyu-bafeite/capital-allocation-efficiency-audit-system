@@ -24,6 +24,7 @@ class FinancialCalculator:
         fin_dict = self.data.financials.model_dump()
         df = pd.DataFrame(fin_dict, index=years)
         df["exchange_rate_to_reporting_currency"] = self.data.exchange_rate_to_reporting_currency
+        df["closing_exchange_rate_to_reporting_currency"] = self.data.closing_exchange_rate_to_reporting_currency
         df.index.name = "Year"
         return df
 

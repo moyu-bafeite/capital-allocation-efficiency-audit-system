@@ -1,8 +1,7 @@
-import keyword
 import pandas as pd
 import numpy as np
 import futu as ft
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 from data.providers.base import BaseProvider
 
 class FutuOpenDProvider(BaseProvider): 
@@ -82,18 +81,67 @@ class FutuOpenDProvider(BaseProvider):
             avg_prices = [p if p > 0 else current_price for p in avg_prices]
             financials["avg_stock_price"] = avg_prices
 
-            # 5. Get Exchange Rates
-            exchange_rates = self._fetch_exchange_rates(quote_ctx, "HKD", reporting_currency, years)
+            # 5. Get Exchange Rates (average and closing)
+            exchange_rates, closing_exchange_rates = self._fetch_exchange_rates(quote_ctx, "HKD", reporting_currency, years)
 
-            # 6. Set buyback shares (absolute number of shares)
-            aligned_buybacks_shares = []
-            for paid, price, rate in zip(financials["buybacks_paid"], financials["avg_stock_price"], exchange_rates):
-                price_rep = price * rate
-                if paid > 0 and price_rep > 0:
-                    aligned_buybacks_shares.append(paid / price_rep)
+            # 6. Fetch exact buyback shares and money using corporate actions API (HK stocks only)
+            buyback_shares_by_year = {year: 0.0 for year in years}
+            buyback_money_by_year = {year: 0.0 for year in years}
+            min_year = min(years)
+            next_key = None
+            has_more = True
+
+            while has_more:
+                ret, data = quote_ctx.get_corporate_actions_buybacks(futu_symbol, next_key=next_key)
+                if ret != ft.RET_OK:
+                    raise ValueError(
+                        f"Failed to fetch corporate buyback actions for {futu_symbol}. "
+                        f"Error: {data}. Please make sure you have the required market data permissions."
+                    )
+
+                records = data.get('hk_buy_back_list', [])
+                if isinstance(records, pd.DataFrame):
+                    if records.empty:
+                        break
+                    records_list = records.to_dict('records')
                 else:
-                    aligned_buybacks_shares.append(0.0)
-            financials["buybacks_shares"] = aligned_buybacks_shares
+                    if not records:
+                        break
+                    records_list = records
+
+                reached_end_of_interest = False
+                for rec in records_list:
+                    # Get date e.g. "2026-04-09"
+                    date_str = rec.get("publ_date_str") or rec.get("end_date_str") or ""
+                    if not date_str:
+                        continue
+                    try:
+                        rec_year = int(date_str.split("-")[0])
+                    except (ValueError, IndexError):
+                        continue
+
+                    if rec_year in buyback_shares_by_year:
+                        # Sum up exact buyback shares and money
+                        buyback_shares_by_year[rec_year] += float(rec.get("buy_back_sum", 0.0))
+                        buyback_money_by_year[rec_year] += float(rec.get("buy_back_money", 0.0))
+
+                    # Descending order, break if record year is strictly less than min_year
+                    if rec_year < min_year:
+                        reached_end_of_interest = True
+
+                if reached_end_of_interest:
+                    break
+
+                next_key = data.get("next_key")
+                if not next_key:
+                    has_more = False
+
+            # Align with requested years list
+            financials["buybacks_shares"] = [buyback_shares_by_year[y] for y in years]
+            # Convert HKD amount to reporting currency using the fetched exchange rate for each year
+            financials["buybacks_paid"] = [
+                buyback_money_by_year[y] * rate for y, rate in zip(years, exchange_rates)
+            ]
 
         finally:
             quote_ctx.stop()
@@ -106,6 +154,7 @@ class FutuOpenDProvider(BaseProvider):
             "amount_unit": "absolute",
             "market_currency": "HKD", # Futu is configured here for HK market
             "exchange_rate_to_reporting_currency": exchange_rates,
+            "closing_exchange_rate_to_reporting_currency": closing_exchange_rates,
             "years": years,
             "financials": financials
         }
@@ -222,18 +271,49 @@ class FutuOpenDProvider(BaseProvider):
 
         return mapped
 
-    def _fetch_exchange_rates(self, quote_ctx, market_currency: str, reporting_currency: str, years: List[int]) -> List[float]:
-        """Fetches exchange rates using FutuOpenD connection."""
+    def _fetch_exchange_rates(self, quote_ctx, market_currency: str, reporting_currency: str, years: List[int]) -> Tuple[List[float], List[float]]:
+        """Fetches historical exchange rates dynamically from Yahoo Finance to ensure high precision."""
         market_currency = market_currency.upper()
         reporting_currency = reporting_currency.upper()
         if market_currency == reporting_currency:
-            return [1.0] * len(years)
+            return [1.0] * len(years), [1.0] * len(years)
 
-        # Try to resolve rate from currency conversions
-        # Default to standard cross rates
-        defaults = {
-            ("HKD", "RMB"): 0.86,
-            ("HKD", "CNY"): 0.86,
-        }
-        rate = defaults.get((market_currency, reporting_currency)) or 1.0
-        return [rate] * len(years)
+        # Standardize 'RMB' to 'CNY' for Yahoo Finance query
+        std_market = "CNY" if market_currency == "RMB" else market_currency
+        std_reporting = "CNY" if reporting_currency == "RMB" else reporting_currency
+
+        if std_market == std_reporting:
+            return [1.0] * len(years), [1.0] * len(years)
+
+        # Cross currency ticker format in Yahoo is e.g. 'HKDCNY=X'
+        cross_symbol = f"{std_market}{std_reporting}=X"
+        import yfinance as yf
+        try:
+            fx_ticker = yf.Ticker(cross_symbol)
+            hist = fx_ticker.history(start=f"{min(years)}-01-01", end=f"{max(years)}-12-31")
+            avg_rates = []
+            closing_rates = []
+            if not hist.empty:
+                hist["Year"] = hist.index.year
+                annual_means = hist.groupby("Year")["Close"].mean()
+                annual_closings = hist.groupby("Year")["Close"].last()
+                for year in years:
+                    avg_rates.append(float(annual_means.get(year, 1.0)))
+                    closing_rates.append(float(annual_closings.get(year, 1.0)))
+            else:
+                avg_rates = closing_rates = [1.0] * len(years)
+            return avg_rates, closing_rates
+        except Exception:
+            # Fallback for popular pairs if network or API fails
+            pair = (market_currency, reporting_currency)
+            defaults = {
+                ("HKD", "RMB"): 0.86,
+                ("HKD", "CNY"): 0.86,
+                ("USD", "RMB"): 6.80,
+                ("USD", "CNY"): 6.80,
+                ("USD", "HKD"): 7.80,
+            }
+            default_rate = defaults.get(pair) or defaults.get((reporting_currency, market_currency), 1.0)
+            if default_rate != 1.0 and defaults.get(pair) is None:
+                default_rate = 1.0 / default_rate
+            return [default_rate] * len(years), [default_rate] * len(years)

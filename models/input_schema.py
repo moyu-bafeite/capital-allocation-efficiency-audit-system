@@ -30,7 +30,8 @@ class CompanyAuditInput(BaseModel):
     currency: str = Field(..., description="Reporting currency used by all financial statement amount fields")
     amount_unit: Literal["million", "absolute"] = Field(..., description="Financial amount unit. 'million' or 'absolute'.")
     market_currency: str = Field(..., description="Currency used by avg_stock_price")
-    exchange_rate_to_reporting_currency: List[float] = Field(..., description="Annual exchange rate: market_currency * rate = reporting currency")
+    exchange_rate_to_reporting_currency: List[float] = Field(..., description="Annual average exchange rate: market_currency * rate = reporting currency")
+    closing_exchange_rate_to_reporting_currency: List[float] = Field(..., description="Closing exchange rate at year-end: market_currency * rate = reporting currency")
     years: List[int]
     financials: FinancialsSchema
 
@@ -51,7 +52,14 @@ class CompanyAuditInput(BaseModel):
                 f"Field 'exchange_rate_to_reporting_currency' must have length {num_years} to match 'years', but got length {len(self.exchange_rate_to_reporting_currency)}"
             )
         if any(rate <= 0 for rate in self.exchange_rate_to_reporting_currency):
-            raise ValueError("All exchange rates must be greater than 0")
+            raise ValueError("All average exchange rates must be greater than 0")
+
+        if len(self.closing_exchange_rate_to_reporting_currency) != num_years:
+            raise ValueError(
+                f"Field 'closing_exchange_rate_to_reporting_currency' must have length {num_years} to match 'years', but got length {len(self.closing_exchange_rate_to_reporting_currency)}"
+            )
+        if any(rate <= 0 for rate in self.closing_exchange_rate_to_reporting_currency):
+            raise ValueError("All closing exchange rates must be greater than 0")
 
         for name, field_value in self.financials.__dict__.items():
             if isinstance(field_value, list):

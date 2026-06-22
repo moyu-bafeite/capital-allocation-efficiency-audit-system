@@ -18,6 +18,7 @@ class MockProvider(BaseProvider):
             "amount_unit": "million",
             "market_currency": "USD",
             "exchange_rate_to_reporting_currency": [1.0] * len(years),
+            "closing_exchange_rate_to_reporting_currency": [1.0] * len(years),
             "years": years,
             "financials": {
                 "net_profit": [100.0] * len(years),

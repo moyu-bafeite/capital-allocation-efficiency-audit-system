@@ -61,7 +61,7 @@ class DataManager:
         for yr, p in zip(years, normalized_data["financials"]["avg_stock_price"]):
             self.cache.save_stock_price(ticker, yr, p)
             
-        # Save exchange rates
+        # Save exchange rates (average and closing)
         for yr, r in zip(years, normalized_data["exchange_rate_to_reporting_currency"]):
             self.cache.save_exchange_rate(
                 from_curr=normalized_data["market_currency"],
@@ -69,6 +69,15 @@ class DataManager:
                 year=yr,
                 rate=r
             )
+
+        if "closing_exchange_rate_to_reporting_currency" in normalized_data:
+            for yr, r in zip(years, normalized_data["closing_exchange_rate_to_reporting_currency"]):
+                self.cache.save_closing_exchange_rate(
+                    from_curr=normalized_data["market_currency"],
+                    to_curr=normalized_data["currency"],
+                    year=yr,
+                    rate=r
+                )
             
         # Save fully parsed input JSON document
         self.cache.save_audit_input(ticker, provider_name, normalized_data)
