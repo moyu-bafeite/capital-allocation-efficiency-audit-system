@@ -45,8 +45,6 @@ class FutuOpenDProvider(BaseProvider):
                 )
                 if ret == ft.RET_OK and "report_list" in data:
                     raw_reports.extend(data["report_list"])
-            if ret == ft.RET_OK and "report_list" in data:
-                raw_reports.extend(data["report_list"])
 
             if not raw_reports:
                 raise ValueError(f"No annual financial statement reports returned from Futu API for {futu_symbol}.")

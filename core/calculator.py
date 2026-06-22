@@ -80,8 +80,6 @@ class FinancialCalculator:
             df_filtered = self.df.loc[start_year:start_year]
             
         total_ocf = df_filtered["operating_cash_flow"].sum()
-        if total_ocf <= 0:
-            total_ocf = 1e-9  # Avoid division by zero
 
         total_capex = df_filtered["capex"].sum()
         total_dividends = df_filtered["dividends_paid"].sum()

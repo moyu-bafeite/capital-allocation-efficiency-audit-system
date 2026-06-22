@@ -79,14 +79,18 @@ def render_capital_allocation_section(data: CompanyAuditInput, result: AuditResu
     st.markdown("###### 资本分配率诊断")
     c1, c2, c3, c4 = st.columns(4)
     total_ocf = waterfall_data["Total_Operating_Cash_Flow"]
+
+    def _pct(value: float, base: float) -> str:
+        return f"{(value / base) * 100:.1f}%" if base > 0 else "N/A"
+
     with c1:
-        st.metric("CapEx 占 OCF 比例", f"{(waterfall_data['CapEx'] / total_ocf) * 100:.1f}%", help="企业重资产程度。该比例越低，说明企业创造自由现金流的能力越强。")
+        st.metric("CapEx 占 OCF 比例", _pct(waterfall_data['CapEx'], total_ocf), help="企业重资产程度。该比例越低，说明企业创造自由现金流的能力越强。")
     with c2:
-        st.metric("现金分红率", f"{(waterfall_data['Dividends'] / total_ocf) * 100:.1f}%", help="分配给股东的现金比例。")
+        st.metric("现金分红率", _pct(waterfall_data['Dividends'], total_ocf), help="分配给股东的现金比例。")
     with c3:
-        st.metric("股份回购率", f"{(waterfall_data['Buybacks'] / total_ocf) * 100:.1f}%", help="利用多余现金在公开市场回购股份注销的力度。")
+        st.metric("股份回购率", _pct(waterfall_data['Buybacks'], total_ocf), help="利用多余现金在公开市场回购股份注销的力度。")
     with c4:
-        st.metric("并购与投资比率", f"{(waterfall_data['M_and_A'] / total_ocf) * 100:.1f}%", help="管理层通过投资或并购实现增长的力度。若该数值过高但 ROIIC 极低，可能是盲目扩张信号。")
+        st.metric("并购与投资比率", _pct(waterfall_data['M_and_A'], total_ocf), help="管理层通过投资或并购实现增长的力度。若该数值过高但 ROIIC 极低，可能是盲目扩张信号。")
 
 
 def render_roic_roiic_section(params: AuditParams, result: AuditResult) -> None:
