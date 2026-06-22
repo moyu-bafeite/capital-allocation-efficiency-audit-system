@@ -148,12 +148,18 @@ def render_buyback_section(data: CompanyAuditInput, result: AuditResult) -> None
             "Buyback_Audit_Rating",
         ]
     ].copy()
+
+    if data.amount_unit == "absolute":
+        audit_display_df["dividends_paid_market_currency"] *= 1e6
+        audit_display_df["buybacks_paid_market_currency"] *= 1e6
+        audit_display_df["buybacks_shares"] *= 1e6
+
     audit_display_df.columns = [
-        f"现金派息总额（{data.market_currency}）",
-        f"回购现金支出（{data.market_currency}）",
+        f"现金派息总额 ({data.market_currency})",
+        f"回购现金支出 ({data.market_currency})",
         "回购股份数量（股）",
-        f"实际回购均价（{data.market_currency}）",
-        f"每股估算内在价值（{data.market_currency}）",
+        f"实际回购均价 ({data.market_currency})",
+        f"每股估算内在价值 ({data.market_currency})",
         "回购均价 / 内在价值",
         "回购效率审计结论",
     ]
@@ -161,11 +167,11 @@ def render_buyback_section(data: CompanyAuditInput, result: AuditResult) -> None
     st.dataframe(
         audit_display_df.style.format(
             {
-                f"现金派息总额（{data.market_currency}）": "{:,.2f}",
-                f"回购现金支出（{data.market_currency}）": "{:,.2f}",
+                f"现金派息总额 ({data.market_currency})": "{:,.0f}",
+                f"回购现金支出 ({data.market_currency})": "{:,.0f}",
                 "回购股份数量（股）": "{:,.0f}",
-                f"实际回购均价（{data.market_currency}）": "{:,.2f}",
-                f"每股估算内在价值（{data.market_currency}）": "{:,.2f}",
+                f"实际回购均价 ({data.market_currency})": "{:,.2f}",
+                f"每股估算内在价值 ({data.market_currency})": "{:,.2f}",
                 "回购均价 / 内在价值": "{:.2%}",
             }
         ).map(
