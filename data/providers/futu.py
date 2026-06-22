@@ -55,30 +55,29 @@ class FutuOpenDProvider(BaseProvider):
             reporting_currency = raw_reports[0].get("currency_code", "HKD")
             financials = self._map_futu_reports(raw_reports, years)
 
-            # 4. Fetch Stock Prices to calculate annual average
-            # Get historical daily K-lines for stock price averaging
-            ret, kline_df, page_req_key = quote_ctx.request_history_kline(
-                futu_symbol, 
-                start=f"{min(years)}-01-01", 
-                end=f"{max(years)}-12-31", 
-                ktype=ft.KLType.K_DAY
-            )
-            
+            # 4. Fetch Stock Prices to calculate annual average (unadjusted, requested yearly)
             avg_prices = []
-            if ret == ft.RET_OK and not kline_df.empty:
-                kline_df["Year"] = pd.to_datetime(kline_df["time_key"]).dt.year
-                annual_means = kline_df.groupby("Year")["close"].mean()
-                for year in years:
-                    avg_prices.append(float(annual_means.get(year, 0.0)))
-            else:
-                avg_prices = [0.0] * len(years)
-
-            # Fallback for stock price if Close is empty
-            ret, snapshot = quote_ctx.get_market_snapshot([futu_symbol])
-            current_price = 10.0
-            if ret == ft.RET_OK and not snapshot.empty:
-                current_price = snapshot.iloc[0].get("last_price", 10.0)
-            avg_prices = [p if p > 0 else current_price for p in avg_prices]
+            for year in years:
+                ret, kline_df, page_req_key = quote_ctx.request_history_kline(
+                    futu_symbol, 
+                    start=f"{year}-01-01", 
+                    end=f"{year}-12-31", 
+                    ktype=ft.KLType.K_DAY,
+                    autype=ft.AuType.NONE
+                )
+                if ret != ft.RET_OK:
+                    raise ValueError(
+                        f"Failed to fetch historical stock prices for {futu_symbol} in year {year}. "
+                        f"Error: {kline_df}."
+                    )
+                if kline_df.empty:
+                    raise ValueError(
+                        f"No historical K-line records returned for {futu_symbol} in year {year}. "
+                        f"Please verify if the stock was listed during this period."
+                    )
+                
+                avg_prices.append(float(kline_df["close"].mean()))
+            
             financials["avg_stock_price"] = avg_prices
 
             # 5. Get Exchange Rates (average and closing)
