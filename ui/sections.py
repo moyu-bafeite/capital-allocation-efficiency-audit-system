@@ -215,7 +215,18 @@ def render_ledger_section(data: CompanyAuditInput, result: AuditResult) -> None:
     st.markdown("#### 📋 审计模型处理底表数据 (Raw Data & Intermediaries)")
     st.markdown("以下为系统输入参数、核心中间指标以及最终审计指标：")
     numeric_columns = result.audited_df.select_dtypes(include="number").columns
-    formatters = {column: "{:,.2f}" for column in numeric_columns}
+    
+    formatters = {}
+    for column in numeric_columns:
+        is_ratio_or_price = any(
+            x in column.lower() 
+            for x in ["rate", "ratio", "price", "roic", "roiic", "rule", "value", "percent"]
+        )
+        if is_ratio_or_price:
+            formatters[column] = "{:,.2f}"
+        else:
+            formatters[column] = "{:,.0f}"
+
     st.dataframe(result.audited_df.style.format(formatters), use_container_width=True)
     st.download_button(
         label="📥 导出完整审计表格为 CSV",
@@ -281,7 +292,7 @@ def render_ledger_section(data: CompanyAuditInput, result: AuditResult) -> None:
 
 def render_selected_section(section: str, data: CompanyAuditInput, params: AuditParams, result: AuditResult) -> None:
     # If the database contains absolute values, we scale a copy of the results to 'million'口径 for all UI presentation logic!
-    if data.amount_unit == "absolute":
+    if data.amount_unit == "absolute" and section != SECTION_LEDGER:
         import dataclasses
         import copy
 
