@@ -2,6 +2,8 @@ import streamlit as st
 
 from models.input_schema import CompanyAuditInput
 from services.audit_pipeline import AuditParams, AuditResult
+from core.scorecard import generate_scorecard, SCORE_WEIGHTS
+from core.commentary import generate_commentary
 from ui.charts import (
     create_allocation_pie_chart,
     create_buyback_chart,
@@ -186,9 +188,55 @@ def render_buyback_section(data: CompanyAuditInput, result: AuditResult) -> None
 
 
 def render_scorecard_section(result: AuditResult) -> None:
-    scorecard = result.scorecard
     st.markdown("#### 🏆 资本配置能力综合量化评分 (Capital Allocation Scorecard)")
     st.markdown("结合定量算法，对增量再投资能力、一美元创造效率、回购纪律及股东派息慷慨度进行多维度加权打分：")
+
+    # Interactive Weights Customization UI
+    with st.expander("⚙️ 自定义评价权重 (Customize Scorecard Weights)", expanded=False):
+        st.caption("拖动滑块或输入数值调整各维度在总分中的占比。确保所有权重加起来等于 100%。")
+        
+        if "persist_w_roic" not in st.session_state:
+            st.session_state.persist_w_roic = SCORE_WEIGHTS["roic"]
+            st.session_state.persist_w_roiic = SCORE_WEIGHTS["roiic"]
+            st.session_state.persist_w_1d = SCORE_WEIGHTS["one_dollar"]
+            st.session_state.persist_w_buyback = SCORE_WEIGHTS["buyback"]
+            st.session_state.persist_w_payout = SCORE_WEIGHTS["payout"]
+
+        col_w1, col_w2, col_w3, col_w4, col_w5 = st.columns(5)
+        
+        with col_w1:
+            w_roic = st.number_input("存量资产创利 (ROIC)", min_value=0.0, max_value=1.0, value=st.session_state.persist_w_roic, key="temp_weight_roic", step=0.05, format="%.2f")
+        with col_w2:
+            w_roiic = st.number_input("增量利润开拓 (ROIIC)", min_value=0.0, max_value=1.0, value=st.session_state.persist_w_roiic, key="temp_weight_roiic", step=0.05, format="%.2f")
+        with col_w3:
+            w_1d = st.number_input("市场市值创造 ($1 Rule)", min_value=0.0, max_value=1.0, value=st.session_state.persist_w_1d, key="temp_weight_one_dollar", step=0.05, format="%.2f")
+        with col_w4:
+            w_buyback = st.number_input("回购折价溢价 (Buyback)", min_value=0.0, max_value=1.0, value=st.session_state.persist_w_buyback, key="temp_weight_buyback", step=0.05, format="%.2f")
+        with col_w5:
+            w_payout = st.number_input("现金回报适配 (Payout)", min_value=0.0, max_value=1.0, value=st.session_state.persist_w_payout, key="temp_weight_payout", step=0.05, format="%.2f")
+            
+        # Update persistent shadow variables to survive tab switching unmounts
+        st.session_state.persist_w_roic = w_roic
+        st.session_state.persist_w_roiic = w_roiic
+        st.session_state.persist_w_1d = w_1d
+        st.session_state.persist_w_buyback = w_buyback
+        st.session_state.persist_w_payout = w_payout
+
+        custom_weights = {
+            "roic": w_roic,
+            "roiic": w_roiic,
+            "one_dollar": w_1d,
+            "buyback": w_buyback,
+            "payout": w_payout
+        }
+        
+        total_weight = sum(custom_weights.values())
+        if abs(total_weight - 1.0) > 0.001:
+            st.warning(f"⚠️ 注意：当前总权重为 {total_weight:.0%}，建议将其调整至 100%。")
+
+    # Real-time recalculation based on interactive weights
+    scorecard = generate_scorecard(result.audited_df, custom_weights)
+    dynamic_commentary = generate_commentary(result.audited_df, scorecard)
 
     col_score1, col_score2 = st.columns([1, 2])
     with col_score1:
@@ -204,14 +252,14 @@ def render_scorecard_section(result: AuditResult) -> None:
         )
         st.markdown("-----")
         st.markdown("###### 📐 五维权重分值细目")
-        st.markdown(f"- 存量资产创利 (30%)：**{scorecard['roic_score']:.0f}**")
-        st.markdown(f"- 增量利润开拓 (25%)：**{scorecard['roiic_score']:.0f}**")
-        st.markdown(f"- 市场市值创造 (20%)：**{scorecard['one_dollar_score']:.0f}**")
-        st.markdown(f"- 回购折价溢价 (10%)：**{scorecard['buyback_score']:.0f}**")
-        st.markdown(f"- 现金回报适配 (15%)：**{scorecard['payout_score']:.0f}**")
+        st.markdown(f"- 存量资产创利 ({w_roic:.0%})：**{scorecard['roic_score']:.0f}**")
+        st.markdown(f"- 增量利润开拓 ({w_roiic:.0%})：**{scorecard['roiic_score']:.0f}**")
+        st.markdown(f"- 市场市值创造 ({w_1d:.0%})：**{scorecard['one_dollar_score']:.0f}**")
+        st.markdown(f"- 回购折价溢价 ({w_buyback:.0%})：**{scorecard['buyback_score']:.0f}**")
+        st.markdown(f"- 现金回报适配 ({w_payout:.0%})：**{scorecard['payout_score']:.0f}**")
 
     with col_score2:
-        st.markdown(result.commentary)
+        st.markdown(dynamic_commentary)
 
 
 def render_ledger_section(data: CompanyAuditInput, result: AuditResult) -> None:

@@ -29,10 +29,11 @@ def _latest_longest_window_value(df: pd.DataFrame, prefix: str) -> tuple[int | N
     return window, col, latest_value
 
 
-def generate_scorecard(df: pd.DataFrame) -> Dict[str, Any]:
+def generate_scorecard(df: pd.DataFrame, custom_weights: Dict[str, float] = None) -> Dict[str, Any]:
     """
     Generate a weighted management capital allocation scorecard.
     """
+    weights = custom_weights if custom_weights is not None else SCORE_WEIGHTS
     avg_roic = df["ROIC"].tail(5).mean()
     if pd.isna(avg_roic):
         roic_score = 80.0
@@ -130,11 +131,11 @@ def generate_scorecard(df: pd.DataFrame) -> Dict[str, Any]:
             payout_score = min(payout_score, 70.0)
 
     composite_score = (
-        roic_score * SCORE_WEIGHTS["roic"]
-        + roiic_score * SCORE_WEIGHTS["roiic"]
-        + one_dollar_score * SCORE_WEIGHTS["one_dollar"]
-        + buyback_score * SCORE_WEIGHTS["buyback"]
-        + payout_score * SCORE_WEIGHTS["payout"]
+        roic_score * weights["roic"]
+        + roiic_score * weights["roiic"]
+        + one_dollar_score * weights["one_dollar"]
+        + buyback_score * weights["buyback"]
+        + payout_score * weights["payout"]
     )
 
     if composite_score >= 95:
