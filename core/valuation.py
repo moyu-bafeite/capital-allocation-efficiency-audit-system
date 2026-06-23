@@ -20,33 +20,27 @@ def calculate_intrinsic_value(
     if stage_1_years <= 0 or stage_2_years <= 0:
         raise ValueError("DCF stage years must be greater than 0")
 
-    intrinsic_values_per_share = []
+    # 1. Precalculate stage discount multipliers once
+    m1 = sum(((1 + growth_stage_1) / (1 + wacc)) ** i for i in range(1, stage_1_years + 1))
 
-    for year in df.index:
-        owner_earnings = df.loc[year, "Owner_Earnings"]
-        shares_raw = df.loc[year, "shares_outstanding"]
-        shares = shares_raw / 1e6 if amount_unit == "million" else shares_raw
+    base_g1 = (1 + growth_stage_1) ** stage_1_years
+    m2 = sum(
+        base_g1 * ((1 + growth_stage_2) ** j) / ((1 + wacc) ** (stage_1_years + j))
+        for j in range(1, stage_2_years + 1)
+    )
 
-        if owner_earnings <= 0 or shares <= 0:
-            intrinsic_values_per_share.append(np.nan)
-            continue
+    base_g2 = base_g1 * ((1 + growth_stage_2) ** stage_2_years)
+    m_tv = (base_g2 * (1 + terminal_growth) / (wacc - terminal_growth)) / ((1 + wacc) ** (stage_1_years + stage_2_years))
 
-        discounted_sum = 0.0
-        current_owner_earnings = owner_earnings
+    total_multiplier = m1 + m2 + m_tv
 
-        for year_offset in range(stage_1_years):
-            current_owner_earnings *= 1 + growth_stage_1
-            discounted_sum += current_owner_earnings / ((1 + wacc) ** (year_offset + 1))
+    # 2. Vectorized pandas operations
+    shares = df["shares_outstanding"] / 1e6 if amount_unit == "million" else df["shares_outstanding"]
+    valid_mask = (df["Owner_Earnings"] > 0) & (shares > 0)
 
-        for year_offset in range(stage_2_years):
-            current_owner_earnings *= 1 + growth_stage_2
-            discount_year = stage_1_years + year_offset + 1
-            discounted_sum += current_owner_earnings / ((1 + wacc) ** discount_year)
+    # 3. Compute intrinsic value for valid rows only to avoid division by zero warnings
+    intrinsic_value = pd.Series(np.nan, index=df.index, dtype=float)
+    if valid_mask.any():
+        intrinsic_value[valid_mask] = (df.loc[valid_mask, "Owner_Earnings"] * total_multiplier) / shares[valid_mask]
 
-        terminal_owner_earnings = current_owner_earnings * (1 + terminal_growth)
-        terminal_value = terminal_owner_earnings / (wacc - terminal_growth)
-        discounted_terminal = terminal_value / ((1 + wacc) ** (stage_1_years + stage_2_years))
-
-        intrinsic_values_per_share.append((discounted_sum + discounted_terminal) / shares)
-
-    return pd.Series(intrinsic_values_per_share, index=df.index, name="Intrinsic_Value_Share")
+    return intrinsic_value.rename("Intrinsic_Value_Share")

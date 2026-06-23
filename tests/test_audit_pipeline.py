@@ -38,6 +38,60 @@ class AuditModulesTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             calculate_intrinsic_value(df, wacc=0.03, terminal_growth=0.03, amount_unit="million")
 
+    def test_dcf_vectorization_multiple_rows_and_invalid_values(self):
+        # Setup multi-row data frame including normal case, zero earnings, negative earnings, zero shares, negative shares, and NaN.
+        df = pd.DataFrame(
+            {
+                "Owner_Earnings": [100.0, 0.0, -50.0, 150.0, 120.0, None],
+                "shares_outstanding": [100.0 * 1e6, 50.0 * 1e6, 50.0 * 1e6, 0.0, -10.0 * 1e6, 100.0 * 1e6],
+            },
+            index=[2020, 2021, 2022, 2023, 2024, 2025],
+        )
+
+        series = calculate_intrinsic_value(
+            df,
+            wacc=0.10,
+            growth_stage_1=0.0,
+            stage_1_years=1,
+            growth_stage_2=0.0,
+            stage_2_years=1,
+            terminal_growth=0.02,
+            amount_unit="million",
+        )
+
+        expected_2020 = (100 / 1.10 + 100 / (1.10**2) + (102 / 0.08) / (1.10**2)) / 100
+        self.assertAlmostEqual(series.loc[2020], expected_2020)
+
+        # All invalid indices (2021, 2022, 2023, 2024, 2025) should result in NaN
+        import numpy as np
+        self.assertTrue(np.isnan(series.loc[2021]))
+        self.assertTrue(np.isnan(series.loc[2022]))
+        self.assertTrue(np.isnan(series.loc[2023]))
+        self.assertTrue(np.isnan(series.loc[2024]))
+        self.assertTrue(np.isnan(series.loc[2025]))
+
+    def test_dcf_no_division_by_zero_warnings(self):
+        import warnings
+        df = pd.DataFrame(
+            {
+                "Owner_Earnings": [100.0, 150.0],
+                "shares_outstanding": [0.0, 100.0 * 1e6],
+            },
+            index=[2020, 2021],
+        )
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            series = calculate_intrinsic_value(df, wacc=0.10, amount_unit="million")
+            
+            # Ensure no runtime/division warnings were triggered
+            for warning in w:
+                self.assertNotIn("divide by zero", str(warning.message))
+                self.assertNotIn("invalid value", str(warning.message))
+
+        self.assertTrue(pd.isna(series.loc[2020]))
+        self.assertFalse(pd.isna(series.loc[2021]))
+
     def test_buyback_audit_rates_discounted_buybacks_as_excellent(self):
         df = pd.DataFrame(
             {
