@@ -9,6 +9,31 @@ class DataManager:
     def __init__(self, db_cache: Optional[DatabaseCache] = None):
         self.cache = db_cache or DatabaseCache()
 
+    def _slice_cached_dict(self, cached_dict: Dict[str, Any], requested_years: List[int]) -> Dict[str, Any]:
+        """Slices the cached dictionary to include only the requested years."""
+        cached_years = cached_dict.get("years", [])
+        try:
+            indices = [cached_years.index(y) for y in requested_years]
+        except ValueError:
+            return cached_dict
+
+        sliced = cached_dict.copy()
+        sliced["years"] = requested_years
+        
+        for root_field in ["exchange_rate_to_reporting_currency", "closing_exchange_rate_to_reporting_currency"]:
+            if root_field in sliced and isinstance(sliced[root_field], list):
+                if len(sliced[root_field]) == len(cached_years):
+                    sliced[root_field] = [sliced[root_field][i] for i in indices]
+
+        if "financials" in sliced:
+            sliced_fin = sliced["financials"].copy()
+            for k, v in sliced_fin.items():
+                if isinstance(v, list) and len(v) == len(cached_years):
+                    sliced_fin[k] = [v[i] for i in indices]
+            sliced["financials"] = sliced_fin
+            
+        return sliced
+
     def get_audit_input(self, ticker: str, provider_name: str, years: List[int], refresh: bool = False) -> CompanyAuditInput:
         """
         Retrieves the CompanyAuditInput from the cache or pulls it from the specified provider API.
@@ -29,7 +54,8 @@ class DataManager:
                 # Double-check years align with cached dictionary.
                 # If cached years match requested years, use it.
                 if set(years).issubset(set(cached_dict.get("years", []))):
-                    return CompanyAuditInput(**cached_dict)
+                    sliced_dict = self._slice_cached_dict(cached_dict, years)
+                    return CompanyAuditInput(**sliced_dict)
 
         # 2. Instantiate correct API provider
         if provider_name == "yahoo":

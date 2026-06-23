@@ -158,5 +158,33 @@ class DataLayerTest(unittest.TestCase):
         self.assertEqual(res.ticker, "TEST")
         self.assertEqual(res.company_name, "Mock Inc")
 
+    def test_data_manager_slices_cached_dict_correctly(self):
+        manager = DataManager(self.cache)
+        cached_dict = {
+            "ticker": "TEST",
+            "company_name": "Test Company",
+            "currency": "USD",
+            "amount_unit": "million",
+            "market_currency": "USD",
+            "years": [2016, 2017, 2018, 2019, 2020],
+            "exchange_rate_to_reporting_currency": [1.0, 1.1, 1.2, 1.3, 1.4],
+            "financials": {
+                "net_profit": [10.0, 20.0, 30.0, 40.0, 50.0],
+                "ebit": [12.0, 22.0, 32.0, 42.0, 52.0]
+            }
+        }
+        
+        # Slice for years [2018, 2019, 2020] (indices 2, 3, 4)
+        sliced = manager._slice_cached_dict(cached_dict, [2018, 2019, 2020])
+        
+        self.assertEqual(sliced["years"], [2018, 2019, 2020])
+        self.assertEqual(sliced["exchange_rate_to_reporting_currency"], [1.2, 1.3, 1.4])
+        self.assertEqual(sliced["financials"]["net_profit"], [30.0, 40.0, 50.0])
+        self.assertEqual(sliced["financials"]["ebit"], [32.0, 42.0, 52.0])
+
+        # Slice with invalid/non-existent year should return original dictionary
+        sliced_invalid = manager._slice_cached_dict(cached_dict, [2018, 2022])
+        self.assertEqual(sliced_invalid, cached_dict)
+
 if __name__ == "__main__":
     unittest.main()

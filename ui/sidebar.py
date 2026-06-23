@@ -180,65 +180,64 @@ def render_sidebar() -> Tuple[CompanyAuditInput, AuditParams]:
         provider_name = "yahoo" if is_yahoo else "futu"
         default_ticker = "0700.HK" if is_yahoo else "HK.00700"
 
-        ticker_input = st.sidebar.text_input("输入港股代码", value=default_ticker, help="例如: 0700.HK, 9988.HK 或 HK.00700").strip()
-        
-        # Years Slider selection
-        years_range = st.sidebar.slider(
-            "选择财报审计年份区间",
-            min_value=2010,
-            max_value=2025,
-            value=(2016, 2025),
-            step=1
-        )
-        years_list = list(range(years_range[0], years_range[1] + 1))
-        
-        force_refresh = st.sidebar.checkbox("强制刷新本地数据库缓存", value=False)
-        fetch_btn = st.sidebar.button("🔍 开始实时拉取并审计")
+        with st.sidebar.form("api_fetch_form"):
+            ticker_input = st.text_input("输入港股代码", value=default_ticker, help="例如: 0700.HK, 9988.HK 或 HK.00700").strip()
+            
+            # Years Slider selection
+            years_range = st.slider(
+                "选择财报审计年份区间",
+                min_value=2010,
+                max_value=2025,
+                value=(2016, 2025),
+                step=1
+            )
+            years_list = list(range(years_range[0], years_range[1] + 1))
+            
+            force_refresh = st.checkbox("强制刷新本地数据库缓存", value=False)
+            fetch_btn = st.form_submit_button("🔍 开始实时拉取并审计")
 
-        # Only bypass cache when both force_refresh and fetch_btn is True
-        bypass_cache = force_refresh and fetch_btn
-
-        # Create source signature key
         source_key = f"{ticker_input}_{provider_name}_{years_range[0]}_{years_range[1]}"
 
-        # 1. Memory/Session Cache check
+        # 1. Memory/Session Cache check (must not bypass cache unless force_refresh is requested via fetch_btn)
+        bypass_cache = force_refresh and fetch_btn
+
         if not bypass_cache and "cached_input_data" in st.session_state and st.session_state.get("cached_source_key") == source_key:
             data_obj = st.session_state["cached_input_data"]
         else:
-            # 2. DuckDB Disk Cache check
+            # 2. Disk or API load (only triggered if the fetch button is clicked or cache is available)
             manager = DataManager()
-            cached_dict = None
-            if not bypass_cache:
-                cached_dict = manager.cache.get_audit_input(ticker_input, provider_name)
-                
-            if cached_dict and set(years_list).issubset(set(cached_dict.get("years", []))):
+            if fetch_btn:
                 try:
-                    data_obj = CompanyAuditInput(**cached_dict)
+                    with st.spinner("正在加载财报数据..."):
+                        data_obj = manager.get_audit_input(
+                            ticker=ticker_input,
+                            provider_name=provider_name,
+                            years=years_list,
+                            refresh=force_refresh
+                        )
                     st.session_state["cached_input_data"] = data_obj
                     st.session_state["cached_source_key"] = source_key
-                    st.sidebar.success(f"成功从本地 DuckDB 缓存载入 {ticker_input}。")
-                except Exception:
-                    cached_dict = None
-
-            # 3. Pull fresh from API if cache misses or refresh is requested
-            if data_obj is None:
-                if fetch_btn:
+                    st.sidebar.success(f"成功加载 {ticker_input} ({years_range[0]}-{years_range[1]})。")
+                except Exception as exc:
+                    st.sidebar.error(f"数据加载失败：{exc}")
+                    st.stop()
+            else:
+                # If button was not clicked, but we have cached dict on disk, try to restore from it silently to avoid cold-start blocking
+                cached_dict = None
+                if not bypass_cache:
+                    cached_dict = manager.cache.get_audit_input(ticker_input, provider_name)
+                
+                if cached_dict and set(years_list).issubset(set(cached_dict.get("years", []))):
                     try:
-                        with st.spinner("正在从 API 抓取财报并保存到本地 DuckDB..."):
-                            data_obj = manager.get_audit_input(
-                                ticker=ticker_input,
-                                provider_name=provider_name,
-                                years=years_list,
-                                refresh=True
-                            )
+                        sliced_dict = manager._slice_cached_dict(cached_dict, years_list)
+                        data_obj = CompanyAuditInput(**sliced_dict)
                         st.session_state["cached_input_data"] = data_obj
                         st.session_state["cached_source_key"] = source_key
-                        st.sidebar.success(f"成功获取 {ticker_input} 数据并缓存至本地！")
-                    except Exception as exc:
-                        st.sidebar.error(f"数据抓取 / 标准化失败：{exc}")
-                        st.stop()
-                else:
-                    st.info("💡 缓存未命中。请点击【开始实时拉取并审计】按钮以从 API 抓取并加载。")
+                    except Exception:
+                        pass
+                
+                if data_obj is None:
+                    st.info("💡 请在侧边栏调整参数，并点击【开始实时拉取并审计】按钮开始。")
                     st.stop()
 
     _render_toolbox()
