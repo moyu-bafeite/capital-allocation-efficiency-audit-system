@@ -16,19 +16,20 @@ def configure_page() -> None:
         """
         <style>
             @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&display=swap');
+            @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400;1,700&family=Noto+Sans+SC:wght@100..900&display=swap');
 
             /* Global styling for Courier Prime */
             html, body, [data-testid="stAppViewContainer"], .main, .sidebar {
-                font-family: 'Courier Prime', monospace;
+                font-family: 'Courier Prime', 'Noto Sans SC', monospace;
             }
 
             /* Apply Courier Prime to standard text and UI widgets */
             h1, h2, h3, h4, h5, h6, p, label, .stMetric, .stMarkdown, input, select, textarea {
-                font-family: 'Courier Prime', monospace !important;
+                font-family: 'Courier Prime', 'Noto Sans SC', monospace !important;
             }
 
             button {
-                font-family: 'Courier Prime', monospace;
+                font-family: 'Courier Prime', 'Noto Sans SC', monospace;
             }
 
             /* Exempt icons from global font styling to ensure stSidebar collapse double arrow displays properly */
