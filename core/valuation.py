@@ -16,7 +16,7 @@ def calculate_intrinsic_value(
     Calculate per-share intrinsic value for each year using a two-stage DCF model.
     """
     if wacc <= terminal_growth:
-        raise ValueError("wacc must be greater than terminal_growth")
+        raise ValueError("WACC must be greater than terminal_growth")
     if stage_1_years <= 0 or stage_2_years <= 0:
         raise ValueError("DCF stage years must be greater than 0")
 

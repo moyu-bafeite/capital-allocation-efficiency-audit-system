@@ -35,9 +35,9 @@ def audit_buybacks(df: pd.DataFrame, amount_unit: str = "million") -> pd.DataFra
     ]
     choices = [
         "无显著回购",
-        "卓越回购（低吸 / 创造价值）",
+        "卓越回购（创造价值）",
         "合理回购（公允对价）",
-        "盲目回购（高位抬轿 / 摧毁价值）",
+        "盲目回购（摧毁价值）",
     ]
 
     audited_df["Buyback_Audit_Rating"] = np.select(conditions, choices, default="无显著回购")
