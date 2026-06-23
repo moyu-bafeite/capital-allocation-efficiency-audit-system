@@ -13,6 +13,7 @@ def get_empty_template() -> str:
         "amount_unit": "absolute",
         "market_currency": "HKD",
         "exchange_rate_to_reporting_currency": [1.0, 1.0, 1.0, 1.0, 1.0],
+        "closing_exchange_rate_to_reporting_currency": [1.0, 1.0, 1.0, 1.0, 1.0],
         "years": [2020, 2021, 2022, 2023, 2024],
         "financials": {
             "net_profit": [100.0, 120.0, 150.0, 130.0, 180.0],
@@ -31,6 +32,8 @@ def get_empty_template() -> str:
             "buybacks_shares": [0.0, 0.0, 2000000.0, 3500000.0, 6000000.0],
             "ma_paid": [10.0, 20.0, 0.0, 30.0, 15.0],
             "goodwill": [100.0, 115.0, 115.0, 140.0, 150.0],
+            "impairment_charges": [0.0, 0.0, 0.0, 0.0, 0.0],
+            "fair_value_changes": [0.0, 0.0, 0.0, 0.0, 0.0],
             "shares_outstanding": [100000000.0, 100000000.0, 98000000.0, 94500000.0, 88500000.0],
             "avg_stock_price": [10.0, 12.0, 9.0, 8.0, 11.0],
         },
