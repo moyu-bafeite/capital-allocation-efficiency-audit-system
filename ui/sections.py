@@ -10,11 +10,11 @@ from ui.charts import (
 )
 
 
-SECTION_CAPITAL_ALLOCATION = "📊 累计资本分配流向 (Cumulative Capital Allocation / Sources & Uses)"
-SECTION_ROIC_ROIIC = "🚀 存量与增量资本配置回报率 (ROIC & ROIIC Capital Efficiency)"
-SECTION_BUYBACK = "🎁 股份回购与红利分配 (Share Repurchase & Dividend Efficacy)"
-SECTION_CHECKLIST = "✅ 资本配置原则清单 (Capital Allocation Principles Checklist)"
-SECTION_LEDGER = "📋 财务数据标准化原始审计底表 (Standardized Financial Indicator Ledger)"
+SECTION_CAPITAL_ALLOCATION = "📊 **累计资本流向**"
+SECTION_ROIC_ROIIC = "🚀 **存量与增量回报**"
+SECTION_BUYBACK = "🎁 **股东回报分配**"
+SECTION_CHECKLIST = "✅ **资本配置清单**"
+SECTION_LEDGER = "📋 **原始审计底表**"
 SECTIONS = [SECTION_CAPITAL_ALLOCATION, SECTION_ROIC_ROIIC, SECTION_BUYBACK, SECTION_CHECKLIST, SECTION_LEDGER]
 
 
@@ -31,7 +31,12 @@ def render_summary(data: CompanyAuditInput, checklist: dict) -> None:
 
 
 def render_navigation() -> str:
-    return st.selectbox("🔍 选择审计分析维度 (Audit Dimensions)", SECTIONS)
+    return st.radio(
+        "🔍 选择审计分析维度 (Audit Dimensions)",
+        SECTIONS,
+        horizontal=True,
+        label_visibility="collapsed"
+    )
 
 
 def render_capital_allocation_section(data: CompanyAuditInput, result: AuditResult) -> None:
