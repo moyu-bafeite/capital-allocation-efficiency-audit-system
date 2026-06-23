@@ -109,6 +109,41 @@ class DataLayerTest(unittest.TestCase):
         self.assertEqual(normalized["financials"]["avg_stock_price"][1], 10.0)
         self.assertGreater(normalized["financials"]["buybacks_shares"][1], 0.0)
 
+    def test_normalizer_handles_optional_non_cash_adjustment_fields(self):
+        # Case A: Fields are completely missing
+        raw_data_missing = {
+            "years": [2020, 2021],
+            "currency": "USD",
+            "amount_unit": "million",
+            "market_currency": "USD",
+            "exchange_rate_to_reporting_currency": [1.0, 1.0],
+            "financials": {
+                "net_profit": [100.0, 120.0],
+            }
+        }
+        normalized_a = normalize_audit_data(raw_data_missing)
+        self.assertIn("impairment_charges", normalized_a["financials"])
+        self.assertIn("fair_value_changes", normalized_a["financials"])
+        self.assertEqual(normalized_a["financials"]["impairment_charges"], [0.0, 0.0])
+        self.assertEqual(normalized_a["financials"]["fair_value_changes"], [0.0, 0.0])
+
+        # Case B: Fields have None or negative values
+        raw_data_with_values = {
+            "years": [2020, 2021],
+            "currency": "USD",
+            "amount_unit": "million",
+            "market_currency": "USD",
+            "exchange_rate_to_reporting_currency": [1.0, 1.0],
+            "financials": {
+                "net_profit": [100.0, 120.0],
+                "impairment_charges": [15.0, None],
+                "fair_value_changes": [-10.0, 50.0], # negative values are preserved (losses)
+            }
+        }
+        normalized_b = normalize_audit_data(raw_data_with_values)
+        self.assertEqual(normalized_b["financials"]["impairment_charges"], [15.0, 0.0])
+        self.assertEqual(normalized_b["financials"]["fair_value_changes"], [-10.0, 50.0])
+
     def test_data_manager_restores_from_cache_successfully(self):
         # We replace the cache engine of manager and mock provider
         manager = DataManager(self.cache)

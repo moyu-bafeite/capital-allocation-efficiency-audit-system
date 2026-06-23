@@ -48,10 +48,16 @@ class FinancialCalculator:
         )
 
         # 4. Owner Earnings
-        # Owner Earnings = Net Profit + D&A - Maintenance CapEx
+        # Owner Earnings = Net Profit + D&A + Impairments - Fair Value Changes - Maintenance CapEx
         maintenance_capex = self.df["capex"] * self.maintenance_capex_ratio
         self.df["maintenance_capex"] = maintenance_capex
-        self.df["Owner_Earnings"] = self.df["net_profit"] + self.df["da"] - maintenance_capex
+        self.df["Owner_Earnings"] = (
+            self.df["net_profit"]
+            + self.df["da"]
+            + self.df["impairment_charges"]
+            - self.df["fair_value_changes"]
+            - maintenance_capex
+        )
 
         # 5. Market Capitalization, converted to the reporting currency and matched to amount_unit.
         self.df["avg_stock_price_reporting_currency"] = (

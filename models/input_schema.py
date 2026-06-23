@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, model_validator
-from typing import List, Literal
+from typing import List, Literal, Optional
 
 class FinancialsSchema(BaseModel):
     """
@@ -23,6 +23,8 @@ class FinancialsSchema(BaseModel):
     goodwill: List[float] = Field(..., description="Goodwill on balance sheet")
     shares_outstanding: List[float] = Field(..., description="Absolute number of outstanding shares")
     avg_stock_price: List[float] = Field(..., description="Average annual stock price, in market_currency per share")
+    impairment_charges: Optional[List[float]] = Field(default=None, description="Goodwill or asset impairment charges (positive for loss)")
+    fair_value_changes: Optional[List[float]] = Field(default=None, description="Fair value changes of investment properties or financial assets (positive for gains, negative for losses)")
 
 class CompanyAuditInput(BaseModel):
     ticker: str
@@ -38,6 +40,13 @@ class CompanyAuditInput(BaseModel):
     @model_validator(mode="after")
     def validate_lengths(self) -> "CompanyAuditInput":
         num_years = len(self.years)
+        
+        # Initialize optional financials lists if they are None to maintain backwards-compatibility
+        if self.financials.impairment_charges is None:
+            self.financials.impairment_charges = [0.0] * num_years
+        if self.financials.fair_value_changes is None:
+            self.financials.fair_value_changes = [0.0] * num_years
+
         if num_years < 2:
             raise ValueError("At least two years of financial data are required")
         if any(year <= prev_year for prev_year, year in zip(self.years, self.years[1:])):

@@ -62,10 +62,13 @@ def normalize_audit_data(raw_data: Dict[str, Any]) -> Dict[str, Any]:
     else:
         financials["avg_stock_price"] = [10.0] * num_years
 
-    # 4. Fill key net_profit or ebit lists
-    for key in ["net_profit", "ebit"]:
+    # 4. Fill key net_profit, ebit and optional non-cash adjustment lists
+    for key in ["net_profit", "ebit", "impairment_charges", "fair_value_changes"]:
         if key in financials:
             financials[key] = [float(v) if v is not None else 0.0 for v in financials[key]]
+        elif key in ["impairment_charges", "fair_value_changes"]:
+            # Optional fields default to 0.0 if entirely missing from API response
+            financials[key] = [0.0] * num_years
         else:
             financials[key] = [0.0] * num_years
 

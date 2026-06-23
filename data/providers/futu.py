@@ -196,6 +196,8 @@ class FutuOpenDProvider(BaseProvider):
             "buybacks_paid": ["回购股份所支付的现金", "回购股份支出", "支付回购股份"],
             "ma_paid": ["收购附属公司"],
             "goodwill": ["商誉"],
+            "impairment_charges": ['减值与拨备'],
+            "fair_value_changes": ['公允价值变动'],
             "shares_outstanding": [
                 "发行在外股数", "实收资本", "总股本", "普通股股数", 
                 "发行在外普通股", "期末普通股股数", "期末发行在外普通股", 

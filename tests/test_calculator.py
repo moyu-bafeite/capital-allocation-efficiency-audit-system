@@ -60,6 +60,23 @@ class FinancialCalculatorTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             FinancialCalculator(make_sample_input(), maintenance_capex_ratio=1.5)
 
+    def test_owner_earnings_with_non_cash_adjustments(self):
+        sample_input = make_sample_input()
+        # Set non-cash adjustments for 2020 (index 0) and 2021 (index 1)
+        sample_input.financials.impairment_charges = [15.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        sample_input.financials.fair_value_changes = [-10.0, 30.0, 0.0, 0.0, 0.0, 0.0]
+
+        calculator = FinancialCalculator(sample_input, maintenance_capex_ratio=0.5)
+        df = calculator.df
+
+        # 2020: net_profit(100) + da(20) + impairment_charges(15) - fair_value_changes(-10) - maintenance_capex(20)
+        # = 100 + 20 + 15 - (-10) - 20 = 125.0
+        self.assertEqual(df.loc[2020, "Owner_Earnings"], 125.0)
+
+        # 2021: net_profit(120) + da(20) + impairment_charges(0) - fair_value_changes(30) - maintenance_capex(20)
+        # = 120 + 20 + 0 - 30 - 20 = 90.0
+        self.assertEqual(df.loc[2021, "Owner_Earnings"], 90.0)
+
 
 if __name__ == "__main__":
     unittest.main()
