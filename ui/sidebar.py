@@ -42,9 +42,9 @@ def get_empty_template() -> str:
 
 def _render_toolbox() -> None:
     st.sidebar.markdown("---")
-    st.sidebar.subheader("🛠️ 工具箱")
+    st.sidebar.subheader("工具箱")
     st.sidebar.download_button(
-        label="⬇️ 下载 JSON 财报输入模板",
+        label="下载 JSON 财报输入模板",
         data=get_empty_template(),
         file_name="capital_allocation_template.json",
         mime="application/json",
@@ -52,7 +52,7 @@ def _render_toolbox() -> None:
 
 def _render_params(data: CompanyAuditInput) -> AuditParams:
     st.sidebar.markdown("---")
-    st.sidebar.header("⚙️ 审计与估值模型参数")
+    st.sidebar.header("审计与估值模型参数")
 
     st.sidebar.subheader("1. 维持性资本支出")
     maintenance_capex_ratio = st.sidebar.slider(
@@ -149,7 +149,7 @@ def _render_params(data: CompanyAuditInput) -> AuditParams:
     )
 
 def render_sidebar() -> Tuple[CompanyAuditInput, AuditParams]:
-    st.sidebar.header("📁 数据源选择 & 载入")
+    st.sidebar.header("数据源选择与载入")
     data_source_opt = st.sidebar.selectbox(
         "选择审计标的",
         [
@@ -169,12 +169,12 @@ def render_sidebar() -> Tuple[CompanyAuditInput, AuditParams]:
             try:
                 raw_data = json.load(uploaded_file)
                 data_obj = CompanyAuditInput(**raw_data)
-                st.sidebar.success("上传成功！")
+                st.sidebar.success("上传成功")
             except Exception as exc:
                 st.sidebar.error(f"解析/校验 JSON 失败: {exc}")
                 st.stop()
         else:
-            st.info("💡 请在侧边栏上传 JSON 财报文件启动审计系统。")
+            st.info("请在侧边栏上传 JSON 财报文件启动审计系统。")
             st.stop()
 
     else:
@@ -197,7 +197,7 @@ def render_sidebar() -> Tuple[CompanyAuditInput, AuditParams]:
             years_list = list(range(years_range[0], years_range[1] + 1))
             
             force_refresh = st.checkbox("强制刷新本地数据库缓存", value=False)
-            fetch_btn = st.form_submit_button("🔍 开始实时拉取并审计")
+            fetch_btn = st.form_submit_button("开始拉取并审计")
 
         source_key = f"{ticker_input}_{provider_name}_{years_range[0]}_{years_range[1]}"
 
@@ -220,7 +220,7 @@ def render_sidebar() -> Tuple[CompanyAuditInput, AuditParams]:
                         )
                     st.session_state["cached_input_data"] = data_obj
                     st.session_state["cached_source_key"] = source_key
-                    st.sidebar.success(f"成功加载 {ticker_input} ({years_range[0]}-{years_range[1]})。")
+                    st.sidebar.success(f"成功加载 {ticker_input} ({years_range[0]}-{years_range[1]})")
                 except Exception as exc:
                     st.sidebar.error(f"数据加载失败：{exc}")
                     st.stop()
@@ -240,7 +240,7 @@ def render_sidebar() -> Tuple[CompanyAuditInput, AuditParams]:
                         pass
                 
                 if data_obj is None:
-                    st.info("💡 请在侧边栏调整参数，并点击【开始实时拉取并审计】按钮开始。")
+                    st.info("请在侧边栏调整参数，并点击【开始拉取并审计】按钮开始。")
                     st.stop()
 
     _render_toolbox()

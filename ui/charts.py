@@ -49,7 +49,7 @@ def create_waterfall_chart(waterfall_data: dict, start_year: int, end_year: int)
         waterfallgap=0.3,
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(family="Courier Prime", color="#ffffff"),
+        font=dict(family="Courier Prime"),
         height=500,
     )
     return fig
@@ -68,10 +68,11 @@ def create_allocation_pie_chart(waterfall_data: dict) -> go.Figure:
         hole=0.4,
         color_discrete_sequence=["#10B981", "#3B82F6", "#EC4899", "#F59E0B", "#6B7280"],
     )
+    fig.update_traces(marker=dict(line=dict(color="rgba(128, 128, 128, 1.0)", width=1.0)))
     fig.update_layout(
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(family="Courier Prime", color="#ffffff"),
+        font=dict(family="Courier Prime"),
         height=350,
         margin=dict(t=10, b=10, l=10, r=10),
     )
@@ -128,7 +129,7 @@ def create_roic_chart(
         yaxis=dict(tickformat=".1%"),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(family="Courier Prime", color="#ffffff"),
+        font=dict(family="Courier Prime"),
         height=500,
         legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="center", x=0.5),
     )
@@ -143,7 +144,7 @@ def create_buyback_chart(display_df, market_currency: str) -> go.Figure:
             y=display_df["Intrinsic_Value_Share_Market_Currency"],
             mode="lines+markers",
             name="保守每股内在价值（折算为市场币种）",
-            line=dict(color="#00ffcc", width=3),
+            line=dict(color="#10B981", width=3),
             marker=dict(size=8),
             hovertemplate="%{x}<br>%{y:,.2f}<extra></extra>",
         )
@@ -180,7 +181,7 @@ def create_buyback_chart(display_df, market_currency: str) -> go.Figure:
         xaxis=dict(tickmode="linear", tick0=min(display_df.index), dtick=1),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(family="Courier Prime", color="#ffffff"),
+        font=dict(family="Courier Prime"),
         height=500,
     )
     return fig

@@ -7,10 +7,10 @@ from ui.sidebar import render_sidebar
 
 def configure_page() -> None:
     st.set_page_config(
-        page_title="管理层资本配置效率审计系统",
+        page_title="资本配置审计系统",
         layout="wide",
         initial_sidebar_state="expanded",
-        page_icon="📈",
+        page_icon=None,
     )
     st.markdown(
         """
@@ -36,11 +36,28 @@ def configure_page() -> None:
             [data-testid="stIcon"], [class*="Icon"], [class*="icon"], [class*="stIcon"] {
                 font-family: inherit !important;
             }
-
-            .main {
-                background-color: #0f111a;
-                color: #ffffff;
+            
+            /* Remove shadows, card rounding and enforce 1px flat borders */
+            div[data-testid="stMetric"] {
+                border-radius: 0px !important;
+                border: 1px solid rgba(128, 128, 128, 0.2) !important;
+                background-color: transparent !important;
+                padding: 1rem !important;
+                box-shadow: none !important;
             }
+            
+            div[data-testid="stForm"] {
+                border-radius: 0px !important;
+                border: 1px solid rgba(128, 128, 128, 0.2) !important;
+                box-shadow: none !important;
+                background-color: transparent !important;
+            }
+
+            button, select, input, textarea {
+                border-radius: 0px !important;
+                box-shadow: none !important;
+            }
+
             div[data-testid="stMetricValue"] {
                 font-size: 1.25rem;
                 font-weight: 700;
@@ -48,10 +65,12 @@ def configure_page() -> None:
                 height: 1.8rem !important;
                 display: flex;
                 align-items: center;
+                color: inherit !important;
             }
             div[data-testid="stMetricLabel"] {
                 font-size: 0.9rem;
-                color: #8892b0;
+                color: inherit !important;
+                opacity: 0.6;
                 line-height: 1.2rem !important;
                 height: 1.4rem !important;
                 display: flex;
@@ -61,11 +80,60 @@ def configure_page() -> None:
                 font-weight: 700 !important;
             }
             .badge-A {
-                background-color: #00ffcc;
-                color: #0f111a;
-                padding: 0.3rem 0.6rem;
-                border-radius: 0.3rem;
+                background-color: transparent;
+                color: inherit;
+                padding: 0.2rem 0.5rem;
+                border-radius: 0px !important;
+                border: 1px solid rgba(128, 128, 128, 0.5);
                 font-weight: bold;
+            }
+            
+            /* Shimo Docs Style Alerts / Callouts */
+            div[data-testid="stAlert"] {
+                background-color: rgba(128, 128, 128, 0.04) !important;
+                border: 1px solid rgba(128, 128, 128, 0.1) !important;
+                border-left: 4px solid rgba(128, 128, 128, 0.6) !important;
+                border-radius: 0px !important;
+                color: inherit !important;
+                box-shadow: none !important;
+                padding: 0.8rem 1rem !important;
+            }
+            div[data-testid="stAlert"] > div {
+                background-color: transparent !important;
+                color: inherit !important;
+            }
+            div[data-testid="stAlert"] p, div[data-testid="stAlert"] span, div[data-testid="stAlert"] div {
+                color: inherit !important;
+            }
+            div[data-testid="stAlert"] svg {
+                fill: currentColor !important;
+                color: inherit !important;
+            }
+
+            /* Sharp straight-angle borders for selectboxes, text areas, dataframes, and nested elements */
+            div[data-testid="stSelectbox"],
+            div[data-testid="stSelectbox"] *,
+            div[data-testid="stTextArea"],
+            div[data-testid="stTextArea"] *,
+            div[data-testid="stDataFrame"],
+            div[data-testid="stDataFrame"] *,
+            div[data-testid="stTable"],
+            div[data-testid="stTable"] *,
+            div[data-testid="stTextInput"],
+            div[data-testid="stTextInput"] *,
+            div[data-testid="stNumberInput"],
+            div[data-testid="stNumberInput"] *,
+            div[data-testid="stCheckbox"],
+            div[data-testid="stCheckbox"] *,
+            div[data-baseweb="select"],
+            div[data-baseweb="select"] *,
+            div[data-baseweb="textarea"],
+            div[data-baseweb="textarea"] *,
+            div[data-baseweb="input"],
+            div[data-baseweb="input"] *,
+            textarea,
+            select {
+                border-radius: 0px !important;
             }
         </style>
         """,
@@ -75,7 +143,7 @@ def configure_page() -> None:
 
 def main() -> None:
     configure_page()
-    st.markdown("## 📈 管理层资本配置效率审计系统")
+    st.markdown("## 资本配置审计系统 (Capital Allocation Audit)")
 
     data, params = render_sidebar()
     try:
