@@ -31,6 +31,23 @@ SECTIONS = [
     SECTION_LEDGER,
 ]
 
+def format_compact_currency(value: float, currency: str, amount_unit: str) -> str:
+    """Format an amount as e.g. 'HKD 1.2B' / 'HKD 41.2M'.
+
+    amount_unit == 'million'  -> value is already in millions
+    amount_unit == 'absolute' -> value is in raw currency units
+    """
+    if value is None or pd.isna(value):
+        return "N/A"
+    absolute = value * 1e6 if amount_unit == "million" else value
+    abs_val = abs(absolute)
+    if abs_val >= 1e9:
+        return f"{currency} {absolute / 1e9:.1f}B"
+    if abs_val >= 1e6:
+        return f"{currency} {absolute / 1e6:.1f}M"
+    return f"{currency} {absolute:,.0f}"
+
+
 SECTION_DISPLAY = {
     SECTION_CAPITAL_ALLOCATION: "累计资本流向 · Capital Allocation",
     SECTION_ROIC_ROIIC: "存量与增量回报 · ROIC & ROIIC",
@@ -261,9 +278,9 @@ def render_ma_goodwill_section(data: CompanyAuditInput, params: AuditParams, res
 
     c1, c2, c3, c4 = st.columns(4)
     with c1:
-        st.metric("累计并购现金支出", f"{ma_total:,.0f}", help="审计期间管理层用于并购/投资的累计现金。")
+        st.metric("累计并购现金支出", f"{data.currency} {ma_total: .1f}M", help="审计期间管理层用于并购/投资的累计现金。")
     with c2:
-        st.metric("期末商誉余额", f"{gw_latest:,.0f}", help="资产负债表上的商誉余额，占权益比越高减值风险越大。")
+        st.metric("期末商誉余额", f"{data.currency} {gw_latest:,.1f}M", help="资产负债表上的商誉余额，占权益比越高减值风险越大。")
     with c3:
         st.metric("商誉 / 股东权益", f"{gw_equity_latest:.1%}" if not pd.isna(gw_equity_latest) else "N/A", help="商誉占股东权益比例。")
     with c4:
