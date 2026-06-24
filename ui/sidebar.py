@@ -103,7 +103,7 @@ def _render_params(data: CompanyAuditInput) -> AuditParams:
     wacc = st.sidebar.slider(
         "折现率 (WACC / 机会成本)",
         min_value=0.05,
-        max_value=0.15,
+        max_value=0.50,
         value=0.08,
         step=0.005,
         format="%.3f",
@@ -126,11 +126,11 @@ def _render_params(data: CompanyAuditInput) -> AuditParams:
     )
     terminal_growth = st.sidebar.slider(
         "永续增长率 (Terminal Growth)",
-        min_value=0.00,
+        min_value=-0.05,
         max_value=0.05,
         value=0.02,
-        step=0.005,
-        format="%.3f",
+        step=0.01,
+        format="%.2f",
     )
 
     if wacc <= terminal_growth:
@@ -153,7 +153,7 @@ def render_sidebar() -> Tuple[CompanyAuditInput, AuditParams]:
     data_source_opt = st.sidebar.selectbox(
         "选择审计标的",
         [
-            "从 富途牛牛 (Futu OpenD) 实时拉取",
+            "从 Futu OpenD 实时拉取",
             # "从 雅虎财经 (Yahoo Finance) 实时拉取",
             "上传自定义 JSON 数据文件"
         ],
