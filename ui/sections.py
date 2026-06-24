@@ -31,6 +31,16 @@ SECTIONS = [
     SECTION_LEDGER,
 ]
 
+SECTION_DISPLAY = {
+    SECTION_CAPITAL_ALLOCATION: "累计资本流向 · Capital Allocation",
+    SECTION_ROIC_ROIIC: "存量与增量回报 · ROIC & ROIIC",
+    SECTION_BUYBACK: "股东回报分配 · Shareholder Returns",
+    SECTION_MA_GOODWILL: "并购与商誉审计 · M&A & Goodwill",
+    SECTION_EARNINGS_QUALITY: "盈利质量审计 · Earnings Quality",
+    SECTION_CHECKLIST: "资本配置清单 · Principles Checklist",
+    SECTION_LEDGER: "原始审计底表 · Raw Ledger",
+}
+
 
 def render_summary(data: CompanyAuditInput, checklist: dict) -> None:
     col_meta1, col_meta2, col_meta3, col_meta4 = st.columns(4)
@@ -47,11 +57,15 @@ def render_summary(data: CompanyAuditInput, checklist: dict) -> None:
 
 
 def render_navigation() -> str:
-    return st.radio(
-        "选择审计分析维度 (Audit Dimensions)",
+    st.markdown(
+        '<p class="nav-caption">Audit Dimension</p>',
+        unsafe_allow_html=True,
+    )
+    return st.selectbox(
+        "选择审计分析维度",
         SECTIONS,
-        horizontal=True,
-        label_visibility="collapsed"
+        format_func=lambda s: SECTION_DISPLAY.get(s, s.replace("**", "")),
+        label_visibility="collapsed",
     )
 
 

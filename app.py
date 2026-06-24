@@ -135,6 +135,46 @@ def configure_page() -> None:
             select {
                 border-radius: 0px !important;
             }
+
+            /* Old-money navigation caption: small uppercase tracked label */
+            .nav-caption {
+                font-size: 0.7rem !important;
+                letter-spacing: 0.25em !important;
+                text-transform: uppercase !important;
+                opacity: 0.55;
+                margin: 0 0 0.35rem 0 !important;
+                font-family: 'Courier Prime', 'Noto Sans SC', monospace;
+            }
+
+            /* Top navigation selectbox: compact, hairline border, transparent ground */
+            div[data-testid="stSelectbox"] {
+                max-width: 360px;
+            }
+            div[data-testid="stSelectbox"] > div > div {
+                background-color: transparent !important;
+                border: 1px solid rgba(128, 128, 128, 0.3) !important;
+                box-shadow: none !important;
+            }
+            div[data-testid="stSelectbox"] [data-testid="stSelectboxArrowIcon"] svg {
+                color: rgba(128, 128, 128, 0.6) !important;
+            }
+
+            /* Dropdown popover menu: flat, hairline, monospace, muted hover */
+            div[data-baseweb="popover"] ul[role="listbox"] {
+                border-radius: 0px !important;
+                border: 1px solid rgba(128, 128, 128, 0.3) !important;
+                background-color: var(--background-color, #ffffff) !important;
+                box-shadow: none !important;
+                font-family: 'Courier Prime', 'Noto Sans SC', monospace !important;
+            }
+            div[data-baseweb="popover"] ul[role="listbox"] li {
+                border-radius: 0px !important;
+            }
+            div[data-baseweb="popover"] ul[role="listbox"] li:hover,
+            div[data-baseweb="popover"] ul[role="listbox"] li[aria-selected="true"] {
+                background-color: rgba(128, 128, 128, 0.08) !important;
+                color: inherit !important;
+            }
         </style>
         """,
         unsafe_allow_html=True,
@@ -143,7 +183,6 @@ def configure_page() -> None:
 
 def main() -> None:
     configure_page()
-    st.markdown("## 资本配置审计系统 (Capital Allocation Audit)")
 
     data, params = render_sidebar()
     try:
@@ -152,8 +191,11 @@ def main() -> None:
         st.error(f"❌ 审计模型运行失败：{exc}")
         st.stop()
 
+    col_nav, col_spacer = st.columns([1, 2])
+    with col_nav:
+        selected_section = render_navigation()
+
     render_summary(data, result.checklist)
-    selected_section = render_navigation()
     render_selected_section(selected_section, data, params, result)
 
 
