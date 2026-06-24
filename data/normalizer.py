@@ -26,7 +26,6 @@ def normalize_audit_data(raw_data: Dict[str, Any]) -> Dict[str, Any]:
         "dividends_paid",
         "buybacks_paid",
         "buybacks_shares",
-        "ma_paid",
         "goodwill",
     ]
     for field in non_negative_fields:
@@ -35,6 +34,16 @@ def normalize_audit_data(raw_data: Dict[str, Any]) -> Dict[str, Any]:
             financials[field] = [abs(float(v)) if v is not None else 0.0 for v in financials[field]]
         else:
             financials[field] = [0.0] * num_years
+
+    # ma_paid: signed from API (negative = acquisition outflow, positive = subsidiary cash inflow).
+    # Positive values are rare; zero them out and convert negative outflows to positive magnitudes.
+    if "ma_paid" in financials:
+        financials["ma_paid"] = [
+            max(0.0, -float(v)) if v is not None else 0.0
+            for v in financials["ma_paid"]
+        ]
+    else:
+        financials["ma_paid"] = [0.0] * num_years
 
     # 2. Normalize and check Tax Rates
     if "tax_rate" in financials:

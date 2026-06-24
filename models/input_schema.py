@@ -19,7 +19,7 @@ class FinancialsSchema(BaseModel):
     dividends_paid: List[float] = Field(..., description="Dividends paid to shareholders")
     buybacks_paid: List[float] = Field(..., description="Cash paid for stock repurchases, in reporting currency and amount_unit")
     buybacks_shares: List[float] = Field(..., description="Absolute number of shares repurchased")
-    ma_paid: List[float] = Field(..., description="Cash paid for acquisitions / M&A")
+    ma_paid: List[float] = Field(..., description="Cash paid for acquisitions / M&A (non-negative, normalized from signed API values)")
     goodwill: List[float] = Field(..., description="Goodwill on balance sheet")
     shares_outstanding: List[float] = Field(..., description="Absolute number of outstanding shares")
     avg_stock_price: List[float] = Field(..., description="Average annual stock price, in market_currency per share")
