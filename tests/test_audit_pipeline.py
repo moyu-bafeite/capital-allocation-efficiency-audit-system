@@ -106,7 +106,7 @@ class AuditModulesTest(unittest.TestCase):
         self.assertEqual(audited_df.loc[2020, "Buyback_to_Intrinsic_Ratio"], 0.5)
         self.assertIn("卓越", audited_df.loc[2020, "Buyback_Audit_Rating"])
 
-    def test_checklist_generates_six_principles(self):
+    def test_checklist_generates_eight_principles(self):
         df = pd.DataFrame(
             {
                 "ROIC": [0.15, 0.16],
@@ -124,7 +124,7 @@ class AuditModulesTest(unittest.TestCase):
         )
 
         checklist = generate_checklist(df, wacc=0.08)
-        self.assertEqual(len(checklist["principles"]), 6)
+        self.assertEqual(len(checklist["principles"]), 8)
         self.assertEqual(checklist["roiic_col"], "ROIIC_Retained_5Y")
         self.assertIn("pass_count", checklist)
         self.assertIn("summary", checklist)
@@ -147,7 +147,7 @@ class AuditModulesTest(unittest.TestCase):
         self.assertIn("Intrinsic_Value_Share", result.audited_df.columns)
         self.assertIn("Buyback_Audit_Rating", result.audited_df.columns)
         self.assertEqual(result.checklist["roiic_col"], "ROIIC_Retained_5Y")
-        self.assertEqual(len(result.checklist["principles"]), 6)
+        self.assertEqual(len(result.checklist["principles"]), 8)
 
 
 if __name__ == "__main__":

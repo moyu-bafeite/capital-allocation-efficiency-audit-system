@@ -75,6 +75,54 @@ class FinancialCalculator:
             self.df["net_profit"] - self.df["dividends_paid"] - self.df["buybacks_paid"]
         )
 
+        # 7. Goodwill & M&A Capital Efficiency Ratios
+        # Gauge whether management is building an empire via premium acquisitions.
+        self.df["Goodwill_to_Equity"] = np.where(
+            self.df["total_equity"] > 0,
+            self.df["goodwill"] / self.df["total_equity"],
+            np.nan
+        )
+        self.df["Goodwill_to_IC"] = np.where(
+            self.df["Invested_Capital"] > 0,
+            self.df["goodwill"] / self.df["Invested_Capital"],
+            np.nan
+        )
+        self.df["MA_to_OCF"] = np.where(
+            self.df["operating_cash_flow"] > 0,
+            self.df["ma_paid"] / self.df["operating_cash_flow"],
+            np.nan
+        )
+
+        # 8. Free Cash Flow & Earnings Quality
+        # Buffett's owner-earnings philosophy: cash, not accounting accruals, is truth.
+        self.df["FCF"] = self.df["operating_cash_flow"] - self.df["capex"]
+        self.df["OE_to_NetProfit"] = np.where(
+            self.df["net_profit"] > 0,
+            self.df["Owner_Earnings"] / self.df["net_profit"],
+            np.nan
+        )
+        self.df["FCF_to_NetIncome"] = np.where(
+            self.df["net_profit"] > 0,
+            self.df["FCF"] / self.df["net_profit"],
+            np.nan
+        )
+        self.df["Accruals_Ratio"] = np.where(
+            self.df["Invested_Capital"] > 0,
+            (self.df["net_profit"] - self.df["operating_cash_flow"]) / self.df["Invested_Capital"],
+            np.nan
+        )
+        # Owner Earnings Per Share (OEPS) - Buffett's true per-share growth yardstick.
+        shares_for_eps = (
+            self.df["shares_outstanding"] / 1e6
+            if self.data.amount_unit == "million"
+            else self.df["shares_outstanding"]
+        )
+        self.df["OEPS"] = np.where(
+            shares_for_eps > 0,
+            self.df["Owner_Earnings"] / shares_for_eps,
+            np.nan
+        )
+
     def get_waterfall_data(self, start_year: int = None, end_year: int = None) -> Dict[str, float]:
         """Calculates cumulative cash sources and uses over a specified period or the entire period."""
         if start_year is not None and end_year is not None and start_year > end_year:
@@ -145,6 +193,46 @@ class FinancialCalculator:
         )
         return pd.Series(roiic_retained, index=self.df.index, name=f"ROIIC_Retained_{window}Y")
 
+    def calculate_acquisition_roiic(self, window: int = 3, lag: int = 0) -> pd.Series:
+        """
+        Calculates Acquisition ROIIC: incremental NOPAT generated per unit of cash deployed on M&A.
+        Acquisition_ROIIC = (NOPAT_t - NOPAT_{t-window}) / (Cumulative ma_paid over window, shifted by lag years)
+        Mirrors ROIIC_Retained but isolates acquisition capital from total retained earnings,
+        surfacing "empire builders" whose M&A spend fails to clear the cost of capital.
+        """
+        if window <= 0:
+            raise ValueError("window must be greater than 0")
+        if lag < 0:
+            raise ValueError("lag must be greater than or equal to 0")
+
+        nopat_diff = self.df["NOPAT"].diff(window)
+        cumulative_ma = self.df["ma_paid"].rolling(window).sum().shift(lag)
+
+        acquisition_roiic = np.where(
+            cumulative_ma > 0,
+            nopat_diff / cumulative_ma,
+            np.nan
+        )
+        return pd.Series(acquisition_roiic, index=self.df.index, name=f"Acquisition_ROIIC_{window}Y")
+
+    def calculate_growth_diff(self, window: int, col_a: str, col_b: str) -> pd.Series:
+        """
+        Calculates the difference in cumulative growth rates between two columns over a window.
+        Returns (col_a growth - col_b growth). Positive when col_a outpaces col_b.
+        """
+        if window <= 0:
+            raise ValueError("window must be greater than 0")
+
+        a_start = self.df[col_a].shift(window)
+        b_start = self.df[col_b].shift(window)
+        a_growth = np.where(a_start > 0, (self.df[col_a] - a_start) / a_start, np.nan)
+        b_growth = np.where(b_start > 0, (self.df[col_b] - b_start) / b_start, np.nan)
+        return pd.Series(
+            a_growth - b_growth,
+            index=self.df.index,
+            name=f"{col_a}_vs_{col_b}_Growth_{window}Y",
+        )
+
     def calculate_one_dollar_rule(self, window: int = 5) -> pd.Series:
         """
         Calculates Buffet's $1 Rule:
@@ -175,4 +263,7 @@ class FinancialCalculator:
         df_copy[f"ROIIC_Retained_{roiic_window_2}Y"] = self.calculate_rolling_roiic_retained(roiic_window_2, lag=roiic_retained_lag)
         df_copy[f"One_Dollar_Rule_{roiic_window_1}Y"] = self.calculate_one_dollar_rule(roiic_window_1)
         df_copy[f"One_Dollar_Rule_{roiic_window_2}Y"] = self.calculate_one_dollar_rule(roiic_window_2)
+        df_copy[f"Acquisition_ROIIC_{roiic_window_1}Y"] = self.calculate_acquisition_roiic(roiic_window_1, lag=roiic_retained_lag)
+        df_copy[f"Acquisition_ROIIC_{roiic_window_2}Y"] = self.calculate_acquisition_roiic(roiic_window_2, lag=roiic_retained_lag)
+        df_copy[f"Goodwill_vs_NOPAT_Growth_{roiic_window_2}Y"] = self.calculate_growth_diff(roiic_window_2, "goodwill", "NOPAT")
         return df_copy

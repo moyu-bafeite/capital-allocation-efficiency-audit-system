@@ -1,10 +1,14 @@
 import streamlit as st
+import numpy as np
+import pandas as pd
 
 from models.input_schema import CompanyAuditInput
 from services.audit_pipeline import AuditParams, AuditResult
 from ui.charts import (
     create_allocation_pie_chart,
     create_buyback_chart,
+    create_earnings_quality_chart,
+    create_ma_goodwill_chart,
     create_roic_chart,
     create_waterfall_chart,
 )
@@ -13,9 +17,19 @@ from ui.charts import (
 SECTION_CAPITAL_ALLOCATION = "**累计资本流向**"
 SECTION_ROIC_ROIIC = "**存量与增量回报**"
 SECTION_BUYBACK = "**股东回报分配**"
+SECTION_MA_GOODWILL = "**并购与商誉审计**"
+SECTION_EARNINGS_QUALITY = "**盈利质量审计**"
 SECTION_CHECKLIST = "**资本配置清单**"
 SECTION_LEDGER = "**原始审计底表**"
-SECTIONS = [SECTION_CAPITAL_ALLOCATION, SECTION_ROIC_ROIIC, SECTION_BUYBACK, SECTION_CHECKLIST, SECTION_LEDGER]
+SECTIONS = [
+    SECTION_CAPITAL_ALLOCATION,
+    SECTION_ROIC_ROIIC,
+    SECTION_BUYBACK,
+    SECTION_MA_GOODWILL,
+    SECTION_EARNINGS_QUALITY,
+    SECTION_CHECKLIST,
+    SECTION_LEDGER,
+]
 
 
 def render_summary(data: CompanyAuditInput, checklist: dict) -> None:
@@ -194,10 +208,138 @@ def render_buyback_section(data: CompanyAuditInput, result: AuditResult) -> None
     )
 
 
+def render_ma_goodwill_section(data: CompanyAuditInput, params: AuditParams, result: AuditResult) -> None:
+    st.markdown("#### 并购与商誉资本效率审计 (M&A & Goodwill Capital Efficiency)")
+    st.markdown(
+        """
+        警惕"帝国建造者"：用高溢价并购堆砌规模，却无法让并购支出赚回资本成本。
+        *   **商誉 / 股东权益**：攀升意味着资产负债表愈发依赖并购溢价，减值风险积聚。
+        *   **Acquisition ROIIC**：$\\Delta NOPAT / 累计并购支出$。衡量并购资本是否赚回资本成本，低于 WACC 即为价值毁灭。
+        *   **商誉增速 vs NOPAT 增速**：正值代表商誉膨胀快于利润增厚，并购未转化为真实盈利。
+        """
+    )
+
+    acq_col_1 = f"Acquisition_ROIIC_{params.roiic_window_1}Y"
+    acq_col_2 = f"Acquisition_ROIIC_{params.roiic_window_2}Y"
+    st.plotly_chart(
+        create_ma_goodwill_chart(
+            result.audited_df,
+            acq_col_1,
+            acq_col_2,
+            params.roiic_window_1,
+            params.roiic_window_2,
+            params.roiic_retained_lag,
+        ),
+        use_container_width=True,
+    )
+
+    display_df = result.audited_df
+    goodwill_growth_col = next(
+        (c for c in display_df.columns if c.startswith("Goodwill_vs_NOPAT_Growth_")),
+        None,
+    )
+
+    ma_total = float(display_df["ma_paid"].sum()) if "ma_paid" in display_df.columns else 0.0
+    gw_latest = float(display_df["goodwill"].iloc[-1]) if "goodwill" in display_df.columns else 0.0
+    gw_equity_latest = float(display_df["Goodwill_to_Equity"].dropna().iloc[-1]) if "Goodwill_to_Equity" in display_df.columns and not display_df["Goodwill_to_Equity"].dropna().empty else np.nan
+    acq_latest = float(display_df[acq_col_2].dropna().iloc[-1]) if acq_col_2 in display_df.columns and not display_df[acq_col_2].dropna().empty else np.nan
+    gw_growth_latest = float(display_df[goodwill_growth_col].dropna().iloc[-1]) if goodwill_growth_col and not display_df[goodwill_growth_col].dropna().empty else np.nan
+
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        st.metric("累计并购现金支出", f"{ma_total:,.0f}", help="审计期间管理层用于并购/投资的累计现金。")
+    with c2:
+        st.metric("期末商誉余额", f"{gw_latest:,.0f}", help="资产负债表上的商誉余额，占权益比越高减值风险越大。")
+    with c3:
+        st.metric("商誉 / 股东权益", f"{gw_equity_latest:.1%}" if not pd.isna(gw_equity_latest) else "N/A", help="商誉占股东权益比例。")
+    with c4:
+        st.metric("Acquisition ROIIC（最新）", f"{acq_latest:.1%}" if not pd.isna(acq_latest) else "N/A", help="并购支出的增量资本回报率，低于 WACC 即价值毁灭。")
+
+    if not pd.isna(gw_growth_latest):
+        if gw_growth_latest > 0.05:
+            st.warning(
+                f"商誉增速显著超过 NOPAT 增速（差值 +{gw_growth_latest:.1%}），"
+                f"并购溢价持续堆积但未能等比例转化为经营利润，警惕未来商誉减值。"
+            )
+        elif gw_growth_latest < -0.05:
+            st.success(
+                f"NOPAT 增速超过商誉增速（差值 {gw_growth_latest:.1%}），"
+                f"并购整合见效，利润增厚快于商誉膨胀。"
+            )
+
+    st.info(
+        """
+        **指引**：
+        1. 若 **商誉 / 股东权益 > 50%** 且 **Acquisition ROIIC < WACC**，管理层大概率在用高溢价并购毁灭价值。
+        2. 若累计并购支出可观但 NOPAT 增量微弱，应质疑并购战略而非会计处理。
+        """
+    )
+
+
+def render_earnings_quality_section(data: CompanyAuditInput, result: AuditResult) -> None:
+    st.markdown("#### 盈利质量与应计项审计 (Earnings Quality & Accruals Audit)")
+    st.markdown(
+        """
+        巴菲特强调"所有者盈余"而非会计利润：真正属于股东的是现金，不是应计项。
+        *   **所有者盈余 vs 净利润**：长期低于净利润，说明盈利被维持性资本支出或非现金项侵蚀。
+        *   **FCF / 净利润**：现金转化率，低于 80% 需警惕，低于 50% 说明盈利高度依赖应计项。
+        *   **应计项比率**：$(净利润 - 经营现金流) / 投入资本$，持续走高是会计激进的红旗信号（Sloan 异常）。
+        *   **每股所有者盈余 (OEPS)**：巴菲特真正在意的"每股内在增长"口径。
+        """
+    )
+
+    st.plotly_chart(
+        create_earnings_quality_chart(result.audited_df),
+        use_container_width=True,
+    )
+
+    display_df = result.audited_df
+    recent = display_df.tail(5)
+
+    def _safe_latest(col):
+        if col not in display_df.columns:
+            return np.nan
+        vals = display_df[col].dropna()
+        return float(vals.iloc[-1]) if not vals.empty else np.nan
+
+    oe_ratio_latest = _safe_latest("OE_to_NetProfit")
+    fcf_ni_latest = _safe_latest("FCF_to_NetIncome")
+    accruals_latest = _safe_latest("Accruals_Ratio")
+    oeps_latest = _safe_latest("OEPS")
+
+    oe_vals = recent["Owner_Earnings"].dropna() if "Owner_Earnings" in recent.columns else pd.Series(dtype=float)
+    np_vals = recent["net_profit"].dropna() if "net_profit" in recent.columns else pd.Series(dtype=float)
+    if not oe_vals.empty and not np_vals.empty and len(oe_vals) == len(np_vals) and (np_vals > 0).all():
+        oe_cagr = (oe_vals.iloc[-1] / oe_vals.iloc[0]) ** (1 / max(len(oe_vals) - 1, 1)) - 1
+    else:
+        oe_cagr = np.nan
+
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        st.metric("所有者盈余 / 净利润", f"{oe_ratio_latest:.1%}" if not pd.isna(oe_ratio_latest) else "N/A", help="低于 100% 说明所有者盈余不及会计利润，盈利被维持性资本支出或非现金项侵蚀。")
+    with c2:
+        st.metric("FCF / 净利润", f"{fcf_ni_latest:.1%}" if not pd.isna(fcf_ni_latest) else "N/A", help="现金转化率，越高说明盈利含金量越足。")
+    with c3:
+        st.metric("应计项比率", f"{accruals_latest:.1%}" if not pd.isna(accruals_latest) else "N/A", help="正值且走高意味着净利润超过经营现金流，会计利润含应计项偏重。")
+    with c4:
+        st.metric("每股所有者盈余 (OEPS)", f"{oeps_latest:,.2f}" if not pd.isna(oeps_latest) else "N/A", help="巴菲特真正在意的每股内在增长口径。")
+
+    if not pd.isna(oe_cagr):
+        st.info(f"近 {len(oe_vals)} 年所有者盈余年复合增速 (OEPS CAGR)：**{oe_cagr:.1%}**。")
+
+    st.info(
+        """
+        **指引**：
+        1. 若 **所有者盈余长期 < 净利润**，需核查资本支出结构与非现金调整项，盈利质量可能被高估。
+        2. 若 **应计项比率持续为正且攀升**，结合应收账款与存货周转排查收入确认激进风险。
+        """
+    )
+
+
 def render_checklist_section(result: AuditResult) -> None:
     st.markdown("#### 资本配置原则清单 (Capital Allocation Principles Checklist)")
     st.markdown(
-        "以下六条原则基于巴菲特式的资本配置检查清单，"
+        "以下八条原则基于巴菲特式的资本配置检查清单，"
         "每条原则展示**客观事实数据**与**基准对比**，由系统自动计算判定状态。"
         "用户应结合行业特性与公司生命周期阶段，对未通过或警告的原则进行深入研究。"
     )
@@ -206,10 +348,10 @@ def render_checklist_section(result: AuditResult) -> None:
     principles = checklist["principles"]
 
     status_config = {
-        "pass": {"icon": "[ ✔ 通过 ]", "style": "font-weight: 700; color: inherit;"},
-        "fail": {"icon": "[ ✘ 未通过 ]", "style": "font-weight: 700; color: inherit; text-decoration: underline;"},
-        "warning": {"icon": "[ ! 警告 ]", "style": "font-weight: 700; color: inherit; border-bottom: 1px dashed rgba(128,128,128,0.6); display: inline-block;"},
-        "insufficient_data": {"icon": "[ ? 数据不足 ]", "style": "font-weight: 400; color: inherit; opacity: 0.6;"},
+        "pass": {"icon": "[ ✔ 通过 ]", "style": "font-weight: 700; color: #4ca66b;"},
+        "fail": {"icon": "[ ✘ 未通过 ]", "style": "font-weight: 700; color: #c0463e; text-decoration: underline;"},
+        "warning": {"icon": "[ ! 警告 ]", "style": "font-weight: 700; color: #b8860b; border-bottom: 1px dashed rgba(128,128,128,0.6); display: inline-block;"},
+        "insufficient_data": {"icon": "[ ? 数据不足 ]", "style": "font-weight: 400; color: #8a8a8a; opacity: 0.6;"},
     }
 
     for p in principles:
@@ -332,7 +474,7 @@ def render_selected_section(section: str, data: CompanyAuditInput, params: Audit
             "buybacks_paid", "ma_paid", "goodwill", "shares_outstanding", 
             "buybacks_shares", "Market_Cap", "Owner_Earnings", 
             "maintenance_capex", "total_debt", "Invested_Capital", 
-            "Retained_Earnings_Annual"
+            "Retained_Earnings_Annual", "FCF"
         ]
         for f in fields_to_scale:
             if f in scaled_df.columns:
@@ -352,6 +494,10 @@ def render_selected_section(section: str, data: CompanyAuditInput, params: Audit
         render_roic_roiic_section(params, result)
     elif section == SECTION_BUYBACK:
         render_buyback_section(data, result)
+    elif section == SECTION_MA_GOODWILL:
+        render_ma_goodwill_section(data, params, result)
+    elif section == SECTION_EARNINGS_QUALITY:
+        render_earnings_quality_section(data, result)
     elif section == SECTION_CHECKLIST:
         render_checklist_section(result)
     elif section == SECTION_LEDGER:

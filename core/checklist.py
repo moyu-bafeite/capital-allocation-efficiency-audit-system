@@ -335,6 +335,119 @@ def generate_checklist(
 
     principles.append(p6)
 
+    # ---- Principle 7: Do acquisitions create value above cost of capital? ----
+    acq_window, resolved_acq_col, latest_acquisition_roiic = _latest_longest_window_value(
+        df, "Acquisition_ROIIC_"
+    )
+
+    ma_series = df["ma_paid"] if "ma_paid" in df.columns else pd.Series(dtype=float)
+    has_ma = bool((ma_series.fillna(0) > 0).any())
+
+    gw_growth_col = next(
+        (c for c in df.columns if c.startswith("Goodwill_vs_NOPAT_Growth_")),
+        None,
+    )
+    if gw_growth_col is not None:
+        gw_growth_values = df[gw_growth_col].dropna()
+        latest_gw_growth = float(gw_growth_values.iloc[-1]) if not gw_growth_values.empty else np.nan
+    else:
+        latest_gw_growth = np.nan
+
+    if not has_ma or pd.isna(latest_acquisition_roiic):
+        p7 = _build_principle(
+            7,
+            "并购是否创造高于资本成本的价值？",
+            "insufficient_data",
+            "N/A",
+            f"ROIC {avg_roic:.1%} / WACC {wacc:.1%}" if not pd.isna(avg_roic) else "N/A",
+            "审计期间无显著并购支出，或 Acquisition ROIIC 数据不足，无法评估并购资本效率。",
+        )
+    else:
+        if latest_acquisition_roiic >= avg_roic:
+            status = "pass"
+            desc = (
+                f"Acquisition ROIIC {latest_acquisition_roiic:.1%} ≥ ROIC {avg_roic:.1%}，"
+                f"并购支出带来的增量回报不低于存量资本，管理层在为股东创造价值。"
+            )
+        elif latest_acquisition_roiic >= wacc:
+            status = "warning"
+            desc = (
+                f"Acquisition ROIIC {latest_acquisition_roiic:.1%} < ROIC {avg_roic:.1%}，"
+                f"并购回报边际递减但仍高于 WACC {wacc:.1%}，并购尚在创造价值但溢价纪律需警惕。"
+            )
+        else:
+            status = "fail"
+            desc = (
+                f"Acquisition ROIIC {latest_acquisition_roiic:.1%} < WACC {wacc:.1%}，"
+                f"并购支出回报低于资本成本，管理层疑似正在毁灭股东价值。"
+            )
+        p7 = _build_principle(
+            7,
+            "并购是否创造高于资本成本的价值？",
+            status,
+            f"{latest_acquisition_roiic:.1%}",
+            f"ROIC {avg_roic:.1%} / WACC {wacc:.1%}",
+            desc,
+        )
+
+    principles.append(p7)
+
+    # ---- Principle 8: Is earnings quality healthy (cash-backed)? ----
+    np_series = df["net_profit"].tail(5) if "net_profit" in df.columns else pd.Series(dtype=float)
+    ocf_series = df["operating_cash_flow"].tail(5) if "operating_cash_flow" in df.columns else pd.Series(dtype=float)
+    capex_series = df["capex"].tail(5) if "capex" in df.columns else pd.Series(dtype=float)
+
+    common_idx = np_series.index.intersection(ocf_series.index).intersection(capex_series.index)
+    np_aligned = np_series.loc[common_idx]
+    ocf_aligned = ocf_series.loc[common_idx]
+    capex_aligned = capex_series.loc[common_idx]
+
+    positive_np = np_aligned[np_aligned > 0]
+
+    if positive_np.empty:
+        avg_fcf_to_ni = np.nan
+        p8 = _build_principle(
+            8,
+            "盈利质量是否健康（现金转化）？",
+            "insufficient_data",
+            "N/A",
+            "FCF / 净利润 ≥ 80%",
+            "审计期间无正净利润年度，无法评估盈利的现金支撑度。",
+        )
+    else:
+        fcf_aligned = ocf_aligned.loc[positive_np.index] - capex_aligned.loc[positive_np.index]
+        ratios = fcf_aligned / positive_np
+        avg_fcf_to_ni = float(ratios.mean())
+
+        if avg_fcf_to_ni >= 0.8:
+            status = "pass"
+            desc = (
+                f"近 {len(ratios)} 年平均 FCF/净利润 {avg_fcf_to_ni:.1%}，"
+                f"盈利高度由自由现金流支撑，会计利润含金量充足。"
+            )
+        elif avg_fcf_to_ni >= 0.5:
+            status = "warning"
+            desc = (
+                f"近 {len(ratios)} 年平均 FCF/净利润 {avg_fcf_to_ni:.1%}，"
+                f"现金转化偏低，应计项偏重，盈利质量需结合应收与存货进一步核查。"
+            )
+        else:
+            status = "fail"
+            desc = (
+                f"近 {len(ratios)} 年平均 FCF/净利润 {avg_fcf_to_ni:.1%}，"
+                f"自由现金流远低于会计利润，盈利高度依赖应计项，质量存疑。"
+            )
+        p8 = _build_principle(
+            8,
+            "盈利质量是否健康（现金转化）？",
+            status,
+            f"{avg_fcf_to_ni:.1%}",
+            "≥ 80%",
+            desc,
+        )
+
+    principles.append(p8)
+
     # ---- Summary ----
     pass_count = sum(1 for p in principles if p["status"] == "pass")
     warning_count = sum(1 for p in principles if p["status"] == "warning")
@@ -365,4 +478,9 @@ def generate_checklist(
         "one_dollar_col": one_dollar_col,
         "avg_buyback_ratio": avg_buyback_ratio,
         "fcf_payout_ratio": fcf_payout_ratio,
+        "latest_acquisition_roiic": latest_acquisition_roiic,
+        "acquisition_roiic_window": acq_window,
+        "acquisition_roiic_col": resolved_acq_col,
+        "latest_gw_growth": latest_gw_growth,
+        "avg_fcf_to_ni": avg_fcf_to_ni,
     }

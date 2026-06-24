@@ -185,3 +185,137 @@ def create_buyback_chart(display_df, market_currency: str) -> go.Figure:
         height=500,
     )
     return fig
+
+
+def create_ma_goodwill_chart(
+    audited_df,
+    acquisition_roiic_col_1: str,
+    acquisition_roiic_col_2: str,
+    roiic_window_1: int,
+    roiic_window_2: int,
+    roiic_retained_lag: int,
+) -> go.Figure:
+    fig = go.Figure()
+
+    # Left axis: goodwill-to-equity ratio (percent)
+    if "Goodwill_to_Equity" in audited_df.columns:
+        fig.add_trace(
+            go.Scatter(
+                x=audited_df.index,
+                y=audited_df["Goodwill_to_Equity"],
+                mode="lines+markers",
+                name="商誉 / 股东权益",
+                line=dict(color="#F59E0B", width=2.5),
+                marker=dict(size=7),
+                hovertemplate="%{x}<br>%{y:.1%}<extra></extra>",
+            )
+        )
+
+    # Right axis: M&A cash spend as bars
+    if "ma_paid" in audited_df.columns:
+        ma_values = audited_df["ma_paid"]
+        max_value = float(ma_values.max()) if not ma_values.empty else 0.0
+        scale, suffix = (1000.0, "B") if max_value >= 1000 else (1.0, "M")
+        fig.add_trace(
+            go.Bar(
+                x=audited_df.index,
+                y=ma_values / scale,
+                name=f"并购现金支出 ({suffix})",
+                marker=dict(color="rgba(107, 114, 128, 0.35)"),
+                yaxis="y2",
+                hovertemplate="%{x}<br>%{y:.1f}" + suffix + "<extra></extra>",
+            )
+        )
+
+    # Acquisition ROIIC lines (left axis, percent)
+    for col, color, dash, window in [
+        (acquisition_roiic_col_1, "#3399ff", "dash", roiic_window_1),
+        (acquisition_roiic_col_2, "#ff9900", "dot", roiic_window_2),
+    ]:
+        if col in audited_df.columns:
+            fig.add_trace(
+                go.Scatter(
+                    x=audited_df.index,
+                    y=audited_df[col],
+                    mode="lines+markers",
+                    name=f"Acquisition ROIIC（{window} 年滚动，滞后 {roiic_retained_lag} 年）",
+                    line=dict(color=color, width=2, dash=dash),
+                    marker=dict(size=6),
+                    hovertemplate="%{x}<br>%{y:.1%}<extra></extra>",
+                )
+            )
+
+    fig.update_layout(
+        title="商誉占比、并购支出与并购资本回报率",
+        xaxis_title="年份",
+        yaxis=dict(title="回报率 / 占比", tickformat=".1%"),
+        yaxis2=dict(title="并购支出", overlaying="y", side="right", showgrid=False),
+        xaxis=dict(tickmode="linear", tick0=min(audited_df.index), dtick=1),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(family="Courier Prime"),
+        height=500,
+        legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5),
+        barmode="group",
+    )
+    return fig
+
+
+def create_earnings_quality_chart(audited_df) -> go.Figure:
+    fig = go.Figure()
+
+    # Determine amount scale across the three earnings series
+    max_value = 0.0
+    for c in ["net_profit", "Owner_Earnings", "FCF"]:
+        if c in audited_df.columns:
+            vals = audited_df[c].dropna()
+            if not vals.empty:
+                max_value = max(max_value, float(vals.max()))
+    scale, suffix = (1000.0, "B") if max_value >= 1000 else (1.0, "M")
+
+    # Grouped bars: net profit / owner earnings / FCF
+    for col, name, color in [
+        ("net_profit", "净利润", "#8892b0"),
+        ("Owner_Earnings", "所有者盈余", "#10B981"),
+        ("FCF", "自由现金流", "#3399ff"),
+    ]:
+        if col in audited_df.columns:
+            fig.add_trace(
+                go.Bar(
+                    x=audited_df.index,
+                    y=audited_df[col] / scale,
+                    name=f"{name} ({suffix})",
+                    marker=dict(color=color),
+                    hovertemplate="%{x}<br>%{y:.1f}" + suffix + "<extra></extra>",
+                )
+            )
+
+    # Right axis: accruals ratio trend
+    if "Accruals_Ratio" in audited_df.columns:
+        fig.add_trace(
+            go.Scatter(
+                x=audited_df.index,
+                y=audited_df["Accruals_Ratio"],
+                mode="lines+markers",
+                name="应计项比率",
+                line=dict(color="#ff3366", width=2.5),
+                marker=dict(size=8),
+                yaxis="y2",
+                hovertemplate="%{x}<br>%{y:.1%}<extra></extra>",
+            )
+        )
+
+    fig.update_layout(
+        title="净利润 vs 所有者盈余 vs 自由现金流（含应计项比率）",
+        xaxis_title="年份",
+        yaxis=dict(title=f"金额 ({suffix})"),
+        yaxis2=dict(title="应计项比率", overlaying="y", side="right", tickformat=".1%", showgrid=False),
+        xaxis=dict(tickmode="linear", tick0=min(audited_df.index), dtick=1),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(family="Courier Prime"),
+        height=500,
+        legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="center", x=0.5),
+        barmode="group",
+    )
+    return fig
