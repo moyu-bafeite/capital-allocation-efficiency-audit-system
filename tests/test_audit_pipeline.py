@@ -149,8 +149,9 @@ class AuditModulesTest(unittest.TestCase):
         self.assertEqual(result.checklist["roiic_col"], "ROIIC_Retained_5Y")
         self.assertEqual(len(result.checklist["principles"]), 8)
 
-    def test_infinite_roic_in_checklist_principle_1(self):
+    def test_infinite_roic_in_checklist_principles(self):
         import numpy as np
+        # 1. Sustained infinite ROIC
         df = pd.DataFrame(
             {
                 "ROIC": [np.inf, np.inf],
@@ -171,6 +172,59 @@ class AuditModulesTest(unittest.TestCase):
         self.assertEqual(p1["status"], "pass")
         self.assertEqual(p1["value"], "极高 (Negative IC)")
         self.assertIn("特许经营“印钞机”型公司", p1["description"])
+
+        # Principle 2 with infinite avg_roic and latest_roiic = 0.06 (which is < wacc=0.08)
+        # Should be fail
+        p2 = checklist["principles"][1]
+        self.assertEqual(p2["status"], "fail")
+        self.assertEqual(p2["benchmark"], "ROIC 极高 (Negative IC)")
+
+        # Principle 2 with infinite avg_roic and latest_roiic = 0.15 (which is >= wacc=0.08)
+        # Should be pass
+        df_pass = df.copy()
+        df_pass["ROIIC_Retained_5Y"] = [0.15, 0.15]
+        checklist_pass = generate_checklist(df_pass, wacc=0.08)
+        p2_pass = checklist_pass["principles"][1]
+        self.assertEqual(p2_pass["status"], "pass")
+
+        # Principle 6 with sustained infinite ROIC
+        p6 = checklist["principles"][5]
+        self.assertEqual(p6["status"], "pass")
+        self.assertEqual(p6["value"], "持续极高 (Negative IC)")
+
+        # 2. Transitional Leap ROIC (0.15 -> inf)
+        df_leap = df.copy()
+        df_leap["ROIC"] = [0.15, np.inf]
+        checklist_leap = generate_checklist(df_leap, wacc=0.08)
+        p6_leap = checklist_leap["principles"][5]
+        self.assertEqual(p6_leap["status"], "pass")
+        self.assertEqual(p6_leap["value"], "15.0% → 极高")
+
+        # 3. Transitional Slip ROIC (inf -> 0.15)
+        df_slip = df.copy()
+        df_slip["ROIC"] = [np.inf, 0.15]
+        checklist_slip = generate_checklist(df_slip, wacc=0.08)
+        p6_slip = checklist_slip["principles"][5]
+        self.assertEqual(p6_slip["status"], "fail")
+        self.assertEqual(p6_slip["value"], "极高 → 15.0%")
+
+        # Principle 7 with infinite avg_roic, ma_paid > 0, and Acquisition_ROIIC_5Y = 0.06 (< wacc=0.08)
+        # Should be fail
+        df_p7 = df.copy()
+        df_p7["ma_paid"] = [10.0, 10.0]
+        df_p7["Acquisition_ROIIC_5Y"] = [0.06, 0.06]
+        checklist_p7 = generate_checklist(df_p7, wacc=0.08)
+        p7 = checklist_p7["principles"][6]
+        self.assertEqual(p7["status"], "fail")
+        self.assertEqual(p7["benchmark"], "WACC 8.0% (ROIC 极高)")
+
+        # Principle 7 with infinite avg_roic and Acquisition_ROIIC_5Y = 0.15 (>= wacc=0.08)
+        # Should be pass
+        df_p7_pass = df_p7.copy()
+        df_p7_pass["Acquisition_ROIIC_5Y"] = [0.15, 0.15]
+        checklist_p7_pass = generate_checklist(df_p7_pass, wacc=0.08)
+        p7_pass = checklist_p7_pass["principles"][6]
+        self.assertEqual(p7_pass["status"], "pass")
 
 
 if __name__ == "__main__":

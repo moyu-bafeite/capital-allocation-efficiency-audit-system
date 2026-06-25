@@ -119,6 +119,9 @@ def generate_checklist(
             "ROIIC 数据不足，无法评估增量再投资效率。",
         )
     else:
+        # Determine benchmark string
+        benchmark_str = "ROIC 极高 (Negative IC)" if np.isinf(avg_roic) else f"ROIC {avg_roic:.1%}"
+
         if np.isinf(latest_roiic):
             status = "pass"
             val_str = "极高 (Capital-Light)"
@@ -127,6 +130,22 @@ def generate_checklist(
                 f"但税后经营利润 (NOPAT) 仍然实现了增长。这代表了极其优异的“零资本 / 轻资产扩张模式”，"
                 f"边际增量再投资效率极高！"
             )
+        elif np.isinf(avg_roic):
+            # If base ROIC is infinite, as long as latest_roiic >= wacc, it is a pass
+            if latest_roiic >= wacc:
+                status = "pass"
+                val_str = f"{latest_roiic:.1%}"
+                desc = (
+                    f"虽然因存量投入资本为负使得存量 ROIC 视为无限大，但公司增量再投资回报率 (ROIIC) "
+                    f"达到 {latest_roiic:.1%}，远高于 WACC {wacc:.1%}，管理层的增量资金部署依然极其高效。"
+                )
+            else:
+                status = "fail"
+                val_str = f"{latest_roiic:.1%}"
+                desc = (
+                    f"虽然存量 ROIC 视为无限大，但公司增量再投资回报率 (ROIIC) 仅为 {latest_roiic:.1%}，"
+                    f"低于资本成本 WACC {wacc:.1%}，说明留存利润的边际使用效率低下，应加大分红或回购。"
+                )
         elif latest_roiic >= avg_roic:
             status = "pass"
             val_str = f"{latest_roiic:.1%}"
@@ -153,7 +172,7 @@ def generate_checklist(
             "留存利润是否被高效再投资？",
             status,
             val_str,
-            f"ROIC {avg_roic:.1%}",
+            benchmark_str,
             desc,
         )
 
@@ -312,7 +331,6 @@ def generate_checklist(
     if len(recent_roic) >= 2:
         first_roic = float(recent_roic.iloc[0])
         last_roic = float(recent_roic.iloc[-1])
-        trend = last_roic - first_roic
 
         if pd.isna(first_roic) or pd.isna(last_roic):
             p6 = _build_principle(
@@ -323,32 +341,76 @@ def generate_checklist(
                 "ROIC 趋势",
                 "ROIC 数据不足，无法判断趋势方向。",
             )
-        elif trend > 0.01:
+        elif np.isinf(first_roic) and np.isinf(last_roic):
             status = "pass"
             desc = (
-                f"近 {len(recent_roic)} 年 ROIC 从 {first_roic:.1%} "
-                f"提升至 {last_roic:.1%}（+{trend:.1%}），护城河持续加固。"
+                f"公司近 {len(recent_roic)} 年起始与期末的存量 ROIC 均视为无限大（持续处于负投入资本运转的“印钞机”状态），"
+                f"经营壁垒和资信占资优势极其稳固，资本效率卓越且稳定。"
             )
-        elif trend > -0.03:
-            status = "warning"
+            p6 = _build_principle(
+                6,
+                "资本效率趋势是否改善？",
+                status,
+                "持续极高 (Negative IC)",
+                "持续优秀",
+                desc,
+            )
+        elif np.isinf(last_roic):
+            status = "pass"
             desc = (
-                f"近 {len(recent_roic)} 年 ROIC 从 {first_roic:.1%} "
-                f"变动至 {last_roic:.1%}（{trend:+.1%}），基本稳定但需关注。"
+                f"公司近 {len(recent_roic)} 年 ROIC 从起始年份的 {first_roic:.1%} 跨越式跃升至期末年份的无限大（成功转型为零/负投入资本运转的印钞机状态），"
+                f"商业模式和资信壁垒呈现爆发式改善。"
             )
-        else:
+            p6 = _build_principle(
+                6,
+                "资本效率趋势是否改善？",
+                status,
+                f"{first_roic:.1%} → 极高",
+                "持续改善",
+                desc,
+            )
+        elif np.isinf(first_roic):
             status = "fail"
             desc = (
-                f"近 {len(recent_roic)} 年 ROIC 从 {first_roic:.1%} "
-                f"下滑至 {last_roic:.1%}（{trend:.1%}），护城河明显侵蚀。"
+                f"公司近 {len(recent_roic)} 年 ROIC 从起始年份的无限大（负投入资本印钞机状态）跌落至期末年份的 {last_roic:.1%}，"
+                f"说明公司的负投入资本红利有所收窄，或商业渠道优势发生松动，护城河出现侵蚀迹象。"
             )
-        p6 = _build_principle(
-            6,
-            "资本效率趋势是否改善？",
-            status,
-            f"{first_roic:.1%} → {last_roic:.1%}",
-            f"趋势 {trend:+.1%}",
-            desc,
-        )
+            p6 = _build_principle(
+                6,
+                "资本效率趋势是否改善？",
+                status,
+                f"极高 → {last_roic:.1%}",
+                "保持优势",
+                desc,
+            )
+        else:
+            trend = last_roic - first_roic
+            if trend > 0.01:
+                status = "pass"
+                desc = (
+                    f"近 {len(recent_roic)} 年 ROIC 从 {first_roic:.1%} "
+                    f"提升至 {last_roic:.1%}（+{trend:.1%}），护城河持续加固。"
+                )
+            elif trend >= -0.05:
+                status = "warning"
+                desc = (
+                    f"近 {len(recent_roic)} 年 ROIC 从 {first_roic:.1%} "
+                    f"变动至 {last_roic:.1%}（{trend:+.1%}），基本稳定但需关注。"
+                )
+            else:
+                status = "fail"
+                desc = (
+                    f"近 {len(recent_roic)} 年 ROIC 从 {first_roic:.1%} "
+                    f"下滑至 {last_roic:.1%}（{trend:.1%}），护城河明显侵蚀。"
+                )
+            p6 = _build_principle(
+                6,
+                "资本效率趋势是否改善？",
+                status,
+                f"{first_roic:.1%} → {last_roic:.1%}",
+                f"趋势 {trend:+.1%}",
+                desc,
+            )
     else:
         p6 = _build_principle(
             6,
@@ -380,29 +442,56 @@ def generate_checklist(
         latest_gw_growth = np.nan
 
     if not has_ma or pd.isna(latest_acquisition_roiic):
+        benchmark_str = f"ROIC 极高 / WACC {wacc:.1%}" if np.isinf(avg_roic) else (f"ROIC {avg_roic:.1%} / WACC {wacc:.1%}" if not pd.isna(avg_roic) else "N/A")
         p7 = _build_principle(
             7,
             "并购是否创造高于资本成本的价值？",
             "insufficient_data",
             "N/A",
-            f"ROIC {avg_roic:.1%} / WACC {wacc:.1%}" if not pd.isna(avg_roic) else "N/A",
+            benchmark_str,
             "审计期间无显著并购支出，或 Acquisition ROIIC 数据不足，无法评估并购资本效率。",
         )
     else:
-        if latest_acquisition_roiic >= avg_roic:
+        # Determine benchmark string
+        benchmark_str = f"WACC {wacc:.1%}" if np.isinf(avg_roic) else f"ROIC {avg_roic:.1%} / WACC {wacc:.1%}"
+
+        if np.isinf(latest_acquisition_roiic):
             status = "pass"
+            val_str = "极高"
+            desc = f"Acquisition ROIIC 极为卓越（无限大），并购支出高效地创造了无需本金投入的额外税后经营利润！"
+        elif np.isinf(avg_roic):
+            # If base ROIC is infinite, as long as latest_acquisition_roiic >= wacc, it is a pass
+            if latest_acquisition_roiic >= wacc:
+                status = "pass"
+                val_str = f"{latest_acquisition_roiic:.1%}"
+                desc = (
+                    f"虽然因存量投入资本为负使得存量 ROIC 视为无限大，但公司并购增量回报率 (Acquisition ROIIC) "
+                    f"达到 {latest_acquisition_roiic:.1%}，高于 WACC {wacc:.1%}，管理层的外延并购资金配置极其成功。"
+                )
+            else:
+                status = "fail"
+                val_str = f"{latest_acquisition_roiic:.1%}"
+                desc = (
+                    f"虽然存量 ROIC 视为无限大，但公司并购增量回报率 (Acquisition ROIIC) 仅为 {latest_acquisition_roiic:.1%}，"
+                    f"低于 WACC {wacc:.1%}，表明外延并购在低效消耗资金，未能跑赢基本资金成本。"
+                )
+        elif latest_acquisition_roiic >= avg_roic:
+            status = "pass"
+            val_str = f"{latest_acquisition_roiic:.1%}"
             desc = (
                 f"Acquisition ROIIC {latest_acquisition_roiic:.1%} ≥ ROIC {avg_roic:.1%}，"
                 f"并购支出带来的增量回报不低于存量资本，管理层在为股东创造价值。"
             )
         elif latest_acquisition_roiic >= wacc:
             status = "warning"
+            val_str = f"{latest_acquisition_roiic:.1%}"
             desc = (
                 f"Acquisition ROIIC {latest_acquisition_roiic:.1%} < ROIC {avg_roic:.1%}，"
                 f"并购回报边际递减但仍高于 WACC {wacc:.1%}，并购尚在创造价值但溢价纪律需警惕。"
             )
         else:
             status = "fail"
+            val_str = f"{latest_acquisition_roiic:.1%}"
             desc = (
                 f"Acquisition ROIIC {latest_acquisition_roiic:.1%} < WACC {wacc:.1%}，"
                 f"并购支出回报低于资本成本，管理层疑似正在毁灭股东价值。"
@@ -411,8 +500,8 @@ def generate_checklist(
             7,
             "并购是否创造高于资本成本的价值？",
             status,
-            f"{latest_acquisition_roiic:.1%}",
-            f"ROIC {avg_roic:.1%} / WACC {wacc:.1%}",
+            val_str,
+            benchmark_str,
             desc,
         )
 
