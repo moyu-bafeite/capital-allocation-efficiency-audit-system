@@ -23,14 +23,22 @@ def create_waterfall_chart(waterfall_data: dict, start_year: int, end_year: int)
         unit_label = "Millions"
         suffix = "M"
 
+    measure = ["absolute", "relative", "relative", "relative", "relative", "total"]
+    hover_texts = []
+    for label, value, m in zip(x_labels, y_values, measure):
+        sign = "+" if (m == "absolute" or value > 0) else "-"
+        hover_texts.append(f"{label}<br>金额: {sign}{abs(value) / scale:.1f}{suffix}")
+
     fig = go.Figure(
         go.Waterfall(
             name="Capital Flow",
             orientation="v",
-            measure=["absolute", "relative", "relative", "relative", "relative", "total"],
+            measure=measure,
             x=x_labels,
             textposition="outside",
             text=[f"{value / scale:.1f}{suffix}" for value in y_values],
+            hovertext=hover_texts,
+            hovertemplate="%{hovertext}<extra></extra>",
             y=y_values,
             connector={"line": {"color": "rgb(63, 63, 63)", "width": 1.5}},
             decreasing={"marker": {"color": "#ff4d4d"}},
