@@ -122,6 +122,24 @@ class FinancialCalculatorTest(unittest.TestCase):
         # With zero M&A spend, cumulative_ma denominator is never positive -> all NaN
         self.assertTrue(df["Acquisition_ROIIC_3Y"].dropna().empty)
 
+    def test_optimized_invested_capital_and_average_roic(self):
+        sample = make_sample_input()
+        sample.financials.short_term_deposits = [100.0, 50.0, 0.0, 0.0, 0.0, 0.0]
+        sample.financials.time_deposits_non_current = [50.0, 30.0, 0.0, 0.0, 0.0, 0.0]
+        calculator = FinancialCalculator(sample, maintenance_capex_ratio=0.5)
+        df = calculator.df
+
+        # 2020: total_equity(500) + debt(150) - cash_and_equiv(50) - short_term_deposits(100) - time_deposits_non_current(50) = 450
+        self.assertEqual(df.loc[2020, "Invested_Capital"], 450.0)
+
+        # 2021: total_equity(550) + debt(150) - cash_and_equiv(50) - short_term_deposits(50) - time_deposits_non_current(30) = 570
+        self.assertEqual(df.loc[2021, "Invested_Capital"], 570.0)
+
+        # 2021 average IC: (450 + 570) / 2 = 510
+        # 2021 NOPAT: EBIT(150) * (1 - 0.2) = 120
+        # 2021 ROIC: 120 / 510 = 0.235294...
+        self.assertAlmostEqual(df.loc[2021, "ROIC"], 120.0 / 510.0)
+
 
 if __name__ == "__main__":
     unittest.main()

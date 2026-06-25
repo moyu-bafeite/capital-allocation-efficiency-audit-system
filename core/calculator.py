@@ -31,19 +31,38 @@ class FinancialCalculator:
     def _calculate_base_metrics(self):
         """Calculates core financial metrics and stores them as columns in the DataFrame."""
         # 1. NOPAT (Net Operating Profit After Taxes)
-        self.df["NOPAT"] = self.df["ebit"] * (1 - self.df["tax_rate"])
+        self.df["NOPAT"] = (
+            self.df["ebit"] - self.df["special_items_of_operating_profit"] -
+            self.df["special_items_of_net_profit"]) * (1 - self.df["tax_rate"])
 
         # 2. Invested Capital (IC)
-        # IC = Equity + Debt - Cash
+        # IC = Equity + Debt - (Cash + Deposits + Short-term & Long-term Cash-like/Financial Assets)
         total_debt = self.df["short_term_debt"] + self.df["long_term_debt"]
         self.df["total_debt"] = total_debt
-        self.df["Invested_Capital"] = self.df["total_equity"] + total_debt - self.df["cash_and_equivalents"]
+        total_liquid_cash = (
+            self.df["cash_and_equivalents"]
+            + self.df["short_term_deposits"]
+            + self.df["time_deposits_current"]
+            + self.df["time_deposits_non_current"]
+            + self.df["short_term_investment"]
+            + self.df["long_term_investment"]
+            + self.df["fair_value_financial_assets_current"]
+            + self.df["fair_value_financial_assets_non_current"]
+            + self.df["derivative_financial_assets_current"]
+            + self.df["derivative_financial_assets_non_current"]
+            + self.df["available_for_sale_financial_assets_current"]
+        )
+        self.df["Invested_Capital"] = self.df["total_equity"] + total_debt - total_liquid_cash
 
         # 3. ROIC (Return on Invested Capital)
-        # Handle zero or negative Invested Capital gracefully (light asset or net cash companies)
+        # Calculate ROIC based on Average Invested Capital over the current and previous year
+        # Fallback to the current year's end-of-period Invested Capital for the first year
+        average_ic = (self.df["Invested_Capital"] + self.df["Invested_Capital"].shift(1)) / 2
+        average_ic = average_ic.fillna(self.df["Invested_Capital"])
+        
         self.df["ROIC"] = np.where(
-            self.df["Invested_Capital"] > 0,
-            self.df["NOPAT"] / self.df["Invested_Capital"],
+            average_ic > 0,
+            self.df["NOPAT"] / average_ic,
             np.nan
         )
 
@@ -132,14 +151,14 @@ class FinancialCalculator:
             df_filtered = self.df.loc[start_year:end_year]
         elif start_year is not None:
             df_filtered = self.df.loc[start_year:start_year]
-            
+
         total_ocf = df_filtered["operating_cash_flow"].sum()
 
         total_capex = df_filtered["capex"].sum()
         total_dividends = df_filtered["dividends_paid"].sum()
         total_buybacks = df_filtered["buybacks_paid"].sum()
         total_ma = df_filtered["ma_paid"].sum()
-        
+
         # Calculate the net cash retention/debt change/etc.
         allocated = total_capex + total_dividends + total_buybacks + total_ma
         leftover = total_ocf - allocated
@@ -182,7 +201,7 @@ class FinancialCalculator:
             raise ValueError("lag must be greater than or equal to 0")
 
         nopat_diff = self.df["NOPAT"].diff(window)
-        
+
         # lag=1 uses the completed window before the current year, e.g. T, T+1, T+2 for T+3.
         cumulative_retained = self.df["Retained_Earnings_Annual"].rolling(window).sum().shift(lag)
 
