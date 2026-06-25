@@ -24,6 +24,13 @@ class InputSchemaTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             CompanyAuditInput(**raw)
 
+    def test_optional_fields_initialization_to_zero(self):
+        raw = make_sample_input().model_dump()
+        data = CompanyAuditInput(**raw)
+        self.assertIsNotNone(data.financials.special_items_of_operating_profit)
+        self.assertEqual(data.financials.special_items_of_operating_profit, [0.0] * len(data.years))
+        self.assertEqual(data.financials.short_term_deposits, [0.0] * len(data.years))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -182,27 +182,35 @@ class FutuOpenDProvider(BaseProvider):
         # We define matches using standard Chinese display names found in Futu reports!
         item_definitions = {
             "net_profit": ["归属普通股股东净利润", "归属母公司净利润"],
-            "eps": ["基本每股收益", "基本每股盈余", "每股收益", "每股盈余"],
+            "eps": ["基本每股收益"],
             "ebit": ["营业利润"],
-            "interest_expense": ["融资成本", "财务成本", "财务费用"],
+            "special_items_of_operating_profit": ["经营利润特殊项目"],
+            "special_items_of_net_profit": ["利润特殊项目"],
+            "interest_expense": ["融资成本", "财务成本"],
             "total_equity": ["归属于母公司股东权益合计", "股东权益合计"],
             "short_term_debt": ["短期借款", "银行贷款及透支"],
             "long_term_debt": ["长期借款", "长期银行贷款"],
-            "cash_and_equivalents": ["现金及等价物", "货币资金", "银行存款及现金"],
-            "operating_cash_flow": ["经营活动产生的现金流量", "经营活动现金流量净额"],
-            "capex": ["资本开支", "资本支出", "购买固定资产", "购买物业、厂房及设备"],
-            "da": ["折旧及摊销", "折旧与摊销", "折旧及摊销:"],
-            "dividends_paid": ["分配股利", "已付股息-融资", "支付股息", "分红支出"],
-            "buybacks_paid": ["回购股份所支付的现金", "回购股份支出", "支付回购股份"],
+            "cash_and_equivalents": ["现金及等价物"],
+            "short_term_deposits": ["短期存款", "短期存款-流动资产"],
+            "time_deposits_current": ["定期存款", "定期存款-流动资产"],
+            "short_term_investment": ["短期投资"],
+            "long_term_investment": ["长期投资"],
+            "fair_value_financial_assets_current": ["按公平值入损益金融资产-流动资产"],
+            "derivative_financial_assets_current": ["衍生金融工具-流动资产"],
+            "available_for_sale_financial_assets_current": ["可供出售金融资产-流动资产"],
+            "fair_value_financial_assets_non_current": ["按公平值入损益金融资产-非流动资产"],
+            "derivative_financial_assets_non_current": ["衍生金融工具-非流动资产"],
+            "time_deposits_non_current": ["定期存款-非流动资产"],
+            "operating_cash_flow": ["经营活动现金流量净额"],
+            "capex": ["购买固定资产", "资本开支", "资本支出", "购买物业、厂房及设备"],
+            "da": ["折旧及摊销:", "折旧及摊销", "折旧与摊销"],
+            "dividends_paid": ["已付股息-融资"],
+            "buybacks_paid": [],
             "ma_paid": ["收购附属公司"],
             "goodwill": ["商誉"],
             "impairment_charges": ['减值与拨备'],
             "fair_value_changes": ['公允价值变动'],
-            "shares_outstanding": [
-                "发行在外股数", "实收资本", "总股本", "普通股股数", 
-                "发行在外普通股", "期末普通股股数", "期末发行在外普通股", 
-                "期末股份数", "已发行普通股"
-            ]
+            "shares_outstanding": []
         }
 
         mapped = {}
@@ -244,6 +252,8 @@ class FutuOpenDProvider(BaseProvider):
 
             if pretax_profit > 0:
                 tax_rates[idx] = abs(tax_expense / pretax_profit)
+        
+        mapped["tax_rate"] = tax_rates
 
         # Post-process: Double Insurance calculation of shares_outstanding
         for idx, year in enumerate(years):
@@ -263,8 +273,6 @@ class FutuOpenDProvider(BaseProvider):
                 )
             # Ensure all are stored as integers
             mapped["shares_outstanding"][idx] = int(round(mapped["shares_outstanding"][idx]))
-
-        mapped["tax_rate"] = tax_rates
 
         # Remove internal helper field 'eps'
         mapped.pop("eps", None)

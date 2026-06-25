@@ -25,6 +25,18 @@ class FinancialsSchema(BaseModel):
     avg_stock_price: List[float] = Field(..., description="Average annual stock price, in market_currency per share")
     impairment_charges: Optional[List[float]] = Field(default=None, description="Goodwill or asset impairment charges (positive for loss)")
     fair_value_changes: Optional[List[float]] = Field(default=None, description="Fair value changes of investment properties or financial assets (positive for gains, negative for losses)")
+    special_items_of_operating_profit: Optional[List[float]] = Field(default=None, description="Special items of operating profit / exceptional operating items")
+    special_items_of_net_profit: Optional[List[float]] = Field(default=None, description="Special items of net profit / exceptional non-operating items")
+    short_term_deposits: Optional[List[float]] = Field(default=None, description="Short-term deposits")
+    time_deposits_current: Optional[List[float]] = Field(default=None, description="Time deposits (current)")
+    short_term_investment: Optional[List[float]] = Field(default=None, description="Short-term investments")
+    long_term_investment: Optional[List[float]] = Field(default=None, description="Long-term investments")
+    fair_value_financial_assets_current: Optional[List[float]] = Field(default=None, description="Fair value of financial assets (current)")
+    derivative_financial_assets_current: Optional[List[float]] = Field(default=None, description="Derivative financial assets (current)")
+    available_for_sale_financial_assets_current: Optional[List[float]] = Field(default=None, description="Available for sale financial assets (current)")
+    fair_value_financial_assets_non_current: Optional[List[float]] = Field(default=None, description="Fair value of financial assets (non-current)")
+    derivative_financial_assets_non_current: Optional[List[float]] = Field(default=None, description="Derivative financial assets (non-current)")
+    time_deposits_non_current: Optional[List[float]] = Field(default=None, description="Time deposits (non-current)")
 
 class CompanyAuditInput(BaseModel):
     ticker: str
@@ -42,10 +54,25 @@ class CompanyAuditInput(BaseModel):
         num_years = len(self.years)
         
         # Initialize optional financials lists if they are None to maintain backwards-compatibility
-        if self.financials.impairment_charges is None:
-            self.financials.impairment_charges = [0.0] * num_years
-        if self.financials.fair_value_changes is None:
-            self.financials.fair_value_changes = [0.0] * num_years
+        optional_fields = [
+            "impairment_charges",
+            "fair_value_changes",
+            "special_items_of_operating_profit",
+            "special_items_of_net_profit",
+            "short_term_deposits",
+            "time_deposits_current",
+            "short_term_investment",
+            "long_term_investment",
+            "fair_value_financial_assets_current",
+            "derivative_financial_assets_current",
+            "available_for_sale_financial_assets_current",
+            "fair_value_financial_assets_non_current",
+            "derivative_financial_assets_non_current",
+            "time_deposits_non_current",
+        ]
+        for field_name in optional_fields:
+            if getattr(self.financials, field_name) is None:
+                setattr(self.financials, field_name, [0.0] * num_years)
 
         if num_years < 2:
             raise ValueError("At least two years of financial data are required")

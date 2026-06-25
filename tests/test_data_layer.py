@@ -124,8 +124,10 @@ class DataLayerTest(unittest.TestCase):
         normalized_a = normalize_audit_data(raw_data_missing)
         self.assertIn("impairment_charges", normalized_a["financials"])
         self.assertIn("fair_value_changes", normalized_a["financials"])
+        self.assertIn("special_items_of_operating_profit", normalized_a["financials"])
         self.assertEqual(normalized_a["financials"]["impairment_charges"], [0.0, 0.0])
         self.assertEqual(normalized_a["financials"]["fair_value_changes"], [0.0, 0.0])
+        self.assertEqual(normalized_a["financials"]["special_items_of_operating_profit"], [0.0, 0.0])
 
         # Case B: Fields have None or negative values
         raw_data_with_values = {
@@ -138,11 +140,13 @@ class DataLayerTest(unittest.TestCase):
                 "net_profit": [100.0, 120.0],
                 "impairment_charges": [15.0, None],
                 "fair_value_changes": [-10.0, 50.0], # negative values are preserved (losses)
+                "special_items_of_operating_profit": [5.0, None],
             }
         }
         normalized_b = normalize_audit_data(raw_data_with_values)
         self.assertEqual(normalized_b["financials"]["impairment_charges"], [15.0, 0.0])
         self.assertEqual(normalized_b["financials"]["fair_value_changes"], [-10.0, 50.0])
+        self.assertEqual(normalized_b["financials"]["special_items_of_operating_profit"], [5.0, 0.0])
 
     def test_data_manager_restores_from_cache_successfully(self):
         # We replace the cache engine of manager and mock provider
