@@ -208,7 +208,11 @@ class FinancialCalculator:
         roiic_retained = np.where(
             cumulative_retained > 0,
             nopat_diff / cumulative_retained,
-            np.nan
+            np.where(
+                (cumulative_retained <= 0) & (nopat_diff > 0),
+                np.inf,
+                np.nan
+            )
         )
         return pd.Series(roiic_retained, index=self.df.index, name=f"ROIIC_Retained_{window}Y")
 

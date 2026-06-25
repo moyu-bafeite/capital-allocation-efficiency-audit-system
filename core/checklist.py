@@ -94,7 +94,7 @@ def generate_checklist(
     if roiic_col is None:
         roiic_col = resolved_roiic_col
 
-    if pd.isna(latest_roiic) or pd.isna(avg_roic):
+    if pd.isna(latest_roiic) and pd.isna(avg_roic):
         p2 = _build_principle(
             2,
             "留存利润是否被高效再投资？",
@@ -104,20 +104,31 @@ def generate_checklist(
             "ROIIC 数据不足，无法评估增量再投资效率。",
         )
     else:
-        if latest_roiic >= avg_roic:
+        if np.isinf(latest_roiic):
             status = "pass"
+            val_str = "极高 (Capital-Light)"
+            desc = (
+                f"公司在过去 {roiic_window} 年累计未留下任何盈余（可能全部用于分红与回购），"
+                f"但税后经营利润 (NOPAT) 仍然实现了增长。这代表了极其优异的**“零资本 / 轻资产扩张模式”**，"
+                f"边际增量再投资效率极高！"
+            )
+        elif latest_roiic >= avg_roic:
+            status = "pass"
+            val_str = f"{latest_roiic:.1%}"
             desc = (
                 f"ROIIC {latest_roiic:.1%} ≥ ROIC {avg_roic:.1%}，"
                 f"增量投资回报不低于存量资本，管理层仍能找到高回报投资机会。"
             )
         elif latest_roiic >= wacc:
             status = "warning"
+            val_str = f"{latest_roiic:.1%}"
             desc = (
                 f"ROIIC {latest_roiic:.1%} < ROIC {avg_roic:.1%}，边际效率递减，"
                 f"但仍高于 WACC {wacc:.1%}，再投资仍在创造价值但护城河可能收窄。"
             )
         else:
             status = "fail"
+            val_str = f"{latest_roiic:.1%}"
             desc = (
                 f"ROIIC {latest_roiic:.1%} < WACC {wacc:.1%}，"
                 f"增量投资回报低于资本成本，管理层在低效扩张，应转向分红或回购。"
@@ -126,7 +137,7 @@ def generate_checklist(
             2,
             "留存利润是否被高效再投资？",
             status,
-            f"{latest_roiic:.1%}",
+            val_str,
             f"ROIC {avg_roic:.1%}",
             desc,
         )

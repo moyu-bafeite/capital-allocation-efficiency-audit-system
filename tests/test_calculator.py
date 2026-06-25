@@ -1,4 +1,5 @@
 import unittest
+import numpy as np
 
 from core.calculator import FinancialCalculator
 from models.input_schema import CompanyAuditInput
@@ -139,6 +140,19 @@ class FinancialCalculatorTest(unittest.TestCase):
         # 2021 NOPAT: EBIT(150) * (1 - 0.2) = 120
         # 2021 ROIC: 120 / 510 = 0.235294...
         self.assertAlmostEqual(df.loc[2021, "ROIC"], 120.0 / 510.0)
+
+    def test_capital_light_expansion_returns_inf(self):
+        sample = make_sample_input()
+        sample.financials.dividends_paid = [100, 120, 140, 160, 180, 200]
+        sample.financials.buybacks_paid = [0, 0, 0, 0, 0, 0]
+
+        calculator = FinancialCalculator(sample, maintenance_capex_ratio=0.5)
+        df = calculator.get_processed_df(roiic_window_1=3, roiic_window_2=5, roiic_retained_lag=1)
+
+        # In 2023, window=3, lag=1: cumulative retained for 2020+2021+2022 is 0.
+        # NOPAT grows from 96 (2020) to 168 (2023), so nopat_diff = 72 > 0.
+        # Expected value is np.inf
+        self.assertEqual(df.loc[2023, "ROIIC_Retained_3Y"], np.inf)
 
 
 if __name__ == "__main__":

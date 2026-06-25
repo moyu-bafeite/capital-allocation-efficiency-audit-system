@@ -1,6 +1,6 @@
 import plotly.express as px
 import plotly.graph_objects as go
-
+import numpy as np
 
 def create_waterfall_chart(waterfall_data: dict, start_year: int, end_year: int) -> go.Figure:
     x_labels = ["经营现金流（总流入）", "资本支出 (CapEx)", "现金分红", "股份回购", "投资与并购", "其他现金 / 债务留存"]
@@ -95,11 +95,17 @@ def create_roic_chart(
     roiic_window_2: int,
     roiic_retained_lag: int,
 ) -> go.Figure:
+    # Clone and clean up infinite values to protect chart scaling
+    plot_df = audited_df.copy()
+    plot_df[roiic_retained_col_1] = plot_df[roiic_retained_col_1].replace([np.inf, -np.inf], np.nan)
+    if roiic_retained_col_2 in plot_df.columns:
+        plot_df[roiic_retained_col_2] = plot_df[roiic_retained_col_2].replace([np.inf, -np.inf], np.nan)
+
     fig = go.Figure()
     fig.add_trace(
         go.Scatter(
-            x=audited_df.index,
-            y=audited_df["ROIC"],
+            x=plot_df.index,
+            y=plot_df["ROIC"],
             mode="lines+markers",
             name="ROIC（存量回报率）",
             line=dict(color="#10B981", width=3),
@@ -108,8 +114,8 @@ def create_roic_chart(
     )
     fig.add_trace(
         go.Scatter(
-            x=audited_df.index,
-            y=audited_df[roiic_retained_col_1],
+            x=plot_df.index,
+            y=plot_df[roiic_retained_col_1],
             mode="lines+markers",
             name=f"ROIIC Retained（{roiic_window_1} 年滚动增量，滞后 {roiic_retained_lag} 年）",
             line=dict(color="#3399ff", width=2, dash="dash"),
@@ -120,8 +126,8 @@ def create_roic_chart(
     if roiic_retained_col_2 != roiic_retained_col_1:
         fig.add_trace(
             go.Scatter(
-                x=audited_df.index,
-                y=audited_df[roiic_retained_col_2],
+                x=plot_df.index,
+                y=plot_df[roiic_retained_col_2],
                 mode="lines+markers",
                 name=f"ROIIC Retained（{roiic_window_2} 年滚动增量，滞后 {roiic_retained_lag} 年）",
                 line=dict(color="#ff9900", width=2.5, dash="dot"),
