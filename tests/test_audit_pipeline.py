@@ -149,6 +149,29 @@ class AuditModulesTest(unittest.TestCase):
         self.assertEqual(result.checklist["roiic_col"], "ROIIC_Retained_5Y")
         self.assertEqual(len(result.checklist["principles"]), 8)
 
+    def test_infinite_roic_in_checklist_principle_1(self):
+        import numpy as np
+        df = pd.DataFrame(
+            {
+                "ROIC": [np.inf, np.inf],
+                "ROIIC_Retained_3Y": [0.3, 0.3],
+                "ROIIC_Retained_5Y": [0.06, 0.06],
+                "One_Dollar_Rule_5Y": [1.2, 1.2],
+                "Buyback_to_Intrinsic_Ratio": [pd.NA, pd.NA],
+                "buybacks_paid": [0, 0],
+                "dividends_paid": [10, 10],
+                "Owner_Earnings": [100, 100],
+                "net_profit": [100, 100],
+                "operating_cash_flow": [120, 120],
+                "capex": [20, 20],
+            }
+        )
+        checklist = generate_checklist(df, wacc=0.08)
+        p1 = checklist["principles"][0]
+        self.assertEqual(p1["status"], "pass")
+        self.assertEqual(p1["value"], "极高 (Negative IC)")
+        self.assertIn("特许经营“印钞机”型公司", p1["description"])
+
 
 if __name__ == "__main__":
     unittest.main()

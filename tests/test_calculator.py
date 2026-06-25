@@ -154,6 +154,22 @@ class FinancialCalculatorTest(unittest.TestCase):
         # Expected value is np.inf
         self.assertEqual(df.loc[2023, "ROIIC_Retained_3Y"], np.inf)
 
+    def test_negative_invested_capital_yields_infinite_roic(self):
+        sample = make_sample_input()
+        # Set short-term investments extremely high to drive Invested_Capital negative
+        # total_equity(500) + debt(150) - short_term_investment(1000) = -350
+        sample.financials.short_term_investment = [1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 1000.0]
+
+        calculator = FinancialCalculator(sample, maintenance_capex_ratio=0.5)
+        df = calculator.df
+
+        # Invested capital must be negative
+        self.assertLess(df.loc[2020, "Invested_Capital"], 0)
+        # NOPAT is positive
+        self.assertGreater(df.loc[2020, "NOPAT"], 0)
+        # ROIC must be positive infinity
+        self.assertEqual(df.loc[2020, "ROIC"], np.inf)
+
 
 if __name__ == "__main__":
     unittest.main()

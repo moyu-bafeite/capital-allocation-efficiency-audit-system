@@ -68,6 +68,21 @@ def generate_checklist(
             f"WACC {wacc:.1%}",
             "ROIC 数据不足，无法判断是否创造价值。",
         )
+    elif np.isinf(avg_roic) or (avg_roic > 10.0):
+        status = "pass"
+        desc = (
+            "公司近 5 年平均投入资本为负或零，且税后经营利润 (NOPAT) 持续为正。"
+            "这意味着公司不需要股东与债权人投入额外本金，便能靠经营性负债与丰沛现金流运转（零/负投入资本扩张），"
+            "属于商业壁垒极高的特许经营“印钞机”型公司，其资本效率极高，回报率视为无限大！"
+        )
+        p1 = _build_principle(
+            1,
+            "资本回报率是否高于资本成本？",
+            status,
+            "极高 (Negative IC)",
+            f"WACC {wacc:.1%}",
+            desc,
+        )
     else:
         spread = avg_roic - wacc
         if spread > 0:
@@ -109,7 +124,7 @@ def generate_checklist(
             val_str = "极高 (Capital-Light)"
             desc = (
                 f"公司在过去 {roiic_window} 年累计未留下任何盈余（可能全部用于分红与回购），"
-                f"但税后经营利润 (NOPAT) 仍然实现了增长。这代表了极其优异的**“零资本 / 轻资产扩张模式”**，"
+                f"但税后经营利润 (NOPAT) 仍然实现了增长。这代表了极其优异的“零资本 / 轻资产扩张模式”，"
                 f"边际增量再投资效率极高！"
             )
         elif latest_roiic >= avg_roic:

@@ -97,6 +97,7 @@ def create_roic_chart(
 ) -> go.Figure:
     # Clone and clean up infinite values to protect chart scaling
     plot_df = audited_df.copy()
+    plot_df["ROIC"] = plot_df["ROIC"].replace([np.inf, -np.inf], np.nan)
     plot_df[roiic_retained_col_1] = plot_df[roiic_retained_col_1].replace([np.inf, -np.inf], np.nan)
     if roiic_retained_col_2 in plot_df.columns:
         plot_df[roiic_retained_col_2] = plot_df[roiic_retained_col_2].replace([np.inf, -np.inf], np.nan)
@@ -209,14 +210,20 @@ def create_ma_goodwill_chart(
     roiic_window_2: int,
     roiic_retained_lag: int,
 ) -> go.Figure:
+    # Clone and clean up infinite values to protect chart scaling
+    plot_df = audited_df.copy()
+    for col in [acquisition_roiic_col_1, acquisition_roiic_col_2]:
+        if col in plot_df.columns:
+            plot_df[col] = plot_df[col].replace([np.inf, -np.inf], np.nan)
+
     fig = go.Figure()
 
     # Left axis: goodwill-to-equity ratio (percent)
-    if "Goodwill_to_Equity" in audited_df.columns:
+    if "Goodwill_to_Equity" in plot_df.columns:
         fig.add_trace(
             go.Scatter(
-                x=audited_df.index,
-                y=audited_df["Goodwill_to_Equity"],
+                x=plot_df.index,
+                y=plot_df["Goodwill_to_Equity"],
                 mode="lines+markers",
                 name="商誉 / 股东权益",
                 line=dict(color="#F59E0B", width=2.5),
@@ -226,13 +233,13 @@ def create_ma_goodwill_chart(
         )
 
     # Right axis: M&A cash spend as bars
-    if "ma_paid" in audited_df.columns:
-        ma_values = audited_df["ma_paid"]
+    if "ma_paid" in plot_df.columns:
+        ma_values = plot_df["ma_paid"]
         max_value = float(ma_values.max()) if not ma_values.empty else 0.0
         scale, suffix = (1000.0, "B") if max_value >= 1000 else (1.0, "M")
         fig.add_trace(
             go.Bar(
-                x=audited_df.index,
+                x=plot_df.index,
                 y=ma_values / scale,
                 name=f"并购现金支出 ({suffix})",
                 marker=dict(color="rgba(107, 114, 128, 0.35)"),
@@ -246,11 +253,11 @@ def create_ma_goodwill_chart(
         (acquisition_roiic_col_1, "#3399ff", "dash", roiic_window_1),
         (acquisition_roiic_col_2, "#ff9900", "dot", roiic_window_2),
     ]:
-        if col in audited_df.columns:
+        if col in plot_df.columns:
             fig.add_trace(
                 go.Scatter(
-                    x=audited_df.index,
-                    y=audited_df[col],
+                    x=plot_df.index,
+                    y=plot_df[col],
                     mode="lines+markers",
                     name=f"Acquisition ROIIC（{window} 年滚动，滞后 {roiic_retained_lag} 年）",
                     line=dict(color=color, width=2, dash=dash),
@@ -264,7 +271,7 @@ def create_ma_goodwill_chart(
         xaxis_title="年份",
         yaxis=dict(title="回报率 / 占比", tickformat=".1%"),
         yaxis2=dict(title="并购支出", overlaying="y", side="right", showgrid=False),
-        xaxis=dict(tickmode="linear", tick0=min(audited_df.index), dtick=1),
+        xaxis=dict(tickmode="linear", tick0=min(plot_df.index), dtick=1),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         font=dict(family="Courier Prime"),

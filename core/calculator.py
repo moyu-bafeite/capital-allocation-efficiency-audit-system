@@ -63,7 +63,11 @@ class FinancialCalculator:
         self.df["ROIC"] = np.where(
             average_ic > 0,
             self.df["NOPAT"] / average_ic,
-            np.nan
+            np.where(
+                (average_ic <= 0) & (self.df["NOPAT"] > 0),
+                np.inf,
+                np.nan
+            )
         )
 
         # 4. Owner Earnings
