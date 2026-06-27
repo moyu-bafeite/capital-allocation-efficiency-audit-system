@@ -157,18 +157,18 @@ class FutuOpenDProvider(BaseProvider):
         }
 
     def _clean_ticker(self, ticker: str) -> str:
-        """Standardizes ticker to Futu format 'HK.00700'"""
+        """Standardizes ticker to Futu format 'HK.00388'"""
         ticker = ticker.upper().strip()
         if "." in ticker:
             parts = ticker.split(".")
-            # If standard Yahoo ticker format like '0700.HK' -> 'HK.00700'
+            # If standard Yahoo ticker format like '0388.HK' -> 'HK.00388'
             if parts[1] == "HK":
                 code = parts[0]
                 if len(code) == 4:
                     code = "0" + code
                 return f"HK.{code}"
             return ticker
-        # Raw number code e.g., '700' or '0700' -> 'HK.00700'
+        # Raw number code e.g., '700' or '0388' -> 'HK.00388'
         if ticker.isdigit():
             code = ticker
             while len(code) < 5:

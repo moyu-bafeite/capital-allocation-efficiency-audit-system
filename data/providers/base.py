@@ -7,7 +7,7 @@ class BaseProvider(ABC):
         """
         Fetches raw financials, stock prices, and exchange rates for the given ticker and years.
         
-        :param ticker: Stock ticker/symbol (e.g., '0700.HK').
+        :param ticker: Stock ticker/symbol (e.g., '0388.HK').
         :param years: List of integer fiscal years.
         :return: A dictionary containing metadata, financials, stock prices, and exchange rates.
         """

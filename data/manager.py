@@ -38,7 +38,7 @@ class DataManager:
         """
         Retrieves the CompanyAuditInput from the cache or pulls it from the specified provider API.
         
-        :param ticker: Stock ticker/symbol (e.g. '0700.HK')
+        :param ticker: Stock ticker/symbol (e.g. '0388.HK')
         :param provider_name: Provider name ('yahoo' or 'futu')
         :param years: List of integer fiscal years.
         :param refresh: If True, forces a fresh API call and updates the cache.

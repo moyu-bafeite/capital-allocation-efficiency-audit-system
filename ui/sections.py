@@ -475,7 +475,7 @@ def render_ledger_section(data: CompanyAuditInput, result: AuditResult) -> None:
                 sql_query = ""
 
             with col_sql2:
-                custom_sql = st.text_area("SQL 编辑器", value=sql_query, height=100, placeholder="例如: SELECT * FROM raw_financials WHERE ticker = '0700.HK';")
+                custom_sql = st.text_area("SQL 编辑器", value=sql_query, height=100, placeholder="例如: SELECT * FROM raw_financials WHERE ticker = '0388.HK';")
             
             if custom_sql.strip():
                 try:

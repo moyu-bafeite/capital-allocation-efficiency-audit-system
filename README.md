@@ -87,8 +87,8 @@ http://localhost:8501
 
 ```json
 {
-  "ticker": "0700.HK",
-  "company_name": "腾讯控股",
+  "ticker": "0388.HK",
+  "company_name": "香港交易所",
   "currency": "RMB",
   "amount_unit": "million",
   "market_currency": "HKD",

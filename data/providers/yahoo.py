@@ -8,7 +8,7 @@ class YahooFinanceProvider(BaseProvider):
     def fetch_financial_data(self, ticker: str, years: List[int]) -> Dict[str, Any]:
         """
         Fetches historical financial data from Yahoo Finance.
-        Adjusts symbol format from HK.00700 (Futu) or 0700.HK (Yahoo) automatically.
+        Adjusts symbol format from HK.00388 (Futu) or 0388.HK (Yahoo) automatically.
         """
         yahoo_symbol = self._clean_ticker(ticker)
         ticker_obj = yf.Ticker(yahoo_symbol)
@@ -111,11 +111,11 @@ class YahooFinanceProvider(BaseProvider):
         }
 
     def _clean_ticker(self, ticker: str) -> str:
-        """Standardizes Futu symbol 'HK.00700' -> '0700.HK'"""
+        """Standardizes Futu symbol 'HK.00388' -> '0388.HK'"""
         ticker = ticker.upper().strip()
         if ticker.startswith("HK."):
             code = ticker.split(".")[1]
-            # Strip extra leading zeros to match 0700.HK, or leave 4 digits
+            # Strip extra leading zeros to match 0388.HK, or leave 4 digits
             if len(code) > 4 and code.startswith("0"):
                 code = code[1:]
             return f"{code}.HK"

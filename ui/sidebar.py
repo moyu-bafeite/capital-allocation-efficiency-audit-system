@@ -181,10 +181,10 @@ def render_sidebar() -> Tuple[CompanyAuditInput, AuditParams]:
         # Live APIs (Yahoo or Futu)
         is_yahoo = "Yahoo" in data_source_opt
         provider_name = "yahoo" if is_yahoo else "futu"
-        default_ticker = "0700.HK" if is_yahoo else "HK.00700"
+        default_ticker = "0388.HK" if is_yahoo else "HK.00388"
 
         with st.sidebar.form("api_fetch_form"):
-            ticker_input = st.text_input("输入港股代码", value=default_ticker, help="例如: 0700.HK, 9988.HK 或 HK.00700").strip()
+            ticker_input = st.text_input("输入港股代码", value=default_ticker, help="例如: 0388.HK, 9988.HK 或 HK.00388").strip()
             
             # Years Slider selection
             years_range = st.slider(
