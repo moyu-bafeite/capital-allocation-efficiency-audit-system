@@ -51,43 +51,63 @@ def _render_toolbox() -> None:
         mime="application/json",
     )
 
-def render_pdf_export_button(
+def render_report_export_button(
     data: CompanyAuditInput, params: AuditParams, result: AuditResult
 ) -> None:
-    """
-    Render a sidebar button that exports the full audit as a PDF report.
+    """Render a sidebar section that exports the full audit as a report.
 
+    Provides a format selector (PDF / HTML) and a single "Generate" button.
     Should be called after :func:`render_sidebar` and after ``run_audit`` has
-    produced ``result``. The report is built on-demand when the user clicks;
-    Streamlit re-runs the script on click, so we gate the heavy build behind
-    a session-state flag to avoid rebuilding on every interaction.
+    produced ``result``. The generated file is cached in session state keyed
+    by ticker + format so it survives Streamlit re-runs without rebuilding.
     """
     st.sidebar.markdown("---")
-    st.sidebar.subheader(t("sidebar.pdf_export_header"))
+    st.sidebar.subheader(t("sidebar.report_export_header"))
 
-    button_key = "build_pdf_report_btn"
-    if st.sidebar.button(t("sidebar.pdf_export_button"), key=button_key):
+    fmt = st.sidebar.radio(
+        t("sidebar.report_format.label"),
+        options=["html", "pdf"],
+        format_func=lambda f: t(f"sidebar.report_format.{f}"),
+        index=0,
+        help=t("sidebar.report_format.help"),
+    )
+
+    button_key = "build_report_btn"
+    if st.sidebar.button(t("sidebar.report_export_button"), key=button_key):
         try:
-            with st.spinner(t("sidebar.pdf_export_building")):
-                from report import build_report
+            with st.spinner(t("sidebar.report_export_building")):
+                from report import build_report, build_report_html
 
-                pdf_bytes = build_report(data, params, result)
-            st.session_state["pdf_report_bytes"] = pdf_bytes
-            st.session_state["pdf_report_ticker"] = data.ticker
+                if fmt == "pdf":
+                    payload = build_report(data, params, result)
+                else:
+                    payload = build_report_html(data, params, result)
+            st.session_state["report_bytes"] = payload
+            st.session_state["report_format"] = fmt
+            st.session_state["report_ticker"] = data.ticker
         except ImportError as exc:
-            st.sidebar.error(t("sidebar.pdf_export_dep_error", exc=exc))
+            st.sidebar.error(t("sidebar.report_export_dep_error", exc=exc))
         except Exception as exc:
-            st.sidebar.error(t("sidebar.pdf_export_error", exc=exc))
+            st.sidebar.error(t("sidebar.report_export_error", exc=exc))
 
-    pdf_bytes = st.session_state.get("pdf_report_bytes")
-    cached_ticker = st.session_state.get("pdf_report_ticker")
-    if pdf_bytes and cached_ticker == data.ticker:
-        st.sidebar.download_button(
-            label=t("sidebar.pdf_download"),
-            data=pdf_bytes,
-            file_name=f"capital_allocation_audit_{data.ticker}.pdf",
-            mime="application/pdf",
-        )
+    payload = st.session_state.get("report_bytes")
+    cached_fmt = st.session_state.get("report_format")
+    cached_ticker = st.session_state.get("report_ticker")
+    if payload and cached_ticker == data.ticker and cached_fmt == fmt:
+        if fmt == "pdf":
+            st.sidebar.download_button(
+                label=t("sidebar.report_download"),
+                data=payload,
+                file_name=f"capital_allocation_audit_{data.ticker}.pdf",
+                mime="application/pdf",
+            )
+        else:
+            st.sidebar.download_button(
+                label=t("sidebar.report_download"),
+                data=payload,
+                file_name=f"capital_allocation_audit_{data.ticker}.html",
+                mime="text/html",
+            )
 
 def _render_params(data: CompanyAuditInput) -> AuditParams:
     st.sidebar.markdown("---")

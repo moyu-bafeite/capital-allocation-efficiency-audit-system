@@ -50,6 +50,46 @@ TRANSLATIONS = {
         "zh": "PDF 生成失败：{exc}",
         "en": "PDF generation failed: {exc}",
     },
+    "sidebar.report_export_header": {
+        "zh": "审计报告导出",
+        "en": "Audit Report Export",
+    },
+    "sidebar.report_format.label": {
+        "zh": "报告格式",
+        "en": "Report Format",
+    },
+    "sidebar.report_format.html": {
+        "zh": "HTML · 交互式 (零依赖，推荐)",
+        "en": "HTML · Interactive (Zero Deps, Recommended)",
+    },
+    "sidebar.report_format.pdf": {
+        "zh": "PDF · 固定排版 (需系统依赖)",
+        "en": "PDF · Fixed Layout (System Deps)",
+    },
+    "sidebar.report_format.help": {
+        "zh": "HTML 报告含可交互图表，无需额外系统依赖，适合屏幕浏览与分享；PDF 报告排版固定，适合打印存档，但需安装 cairo/pango 系统库。",
+        "en": "HTML report has interactive charts and no system dependencies, suited for screen viewing and sharing; PDF report has fixed layout for printing/archiving, but requires cairo/pango system libraries.",
+    },
+    "sidebar.report_export_button": {
+        "zh": "生成审计报告",
+        "en": "Generate Audit Report",
+    },
+    "sidebar.report_export_building": {
+        "zh": "正在生成审计报告，含图表渲染，请稍候...",
+        "en": "Building audit report with charts, please wait...",
+    },
+    "sidebar.report_download": {
+        "zh": "下载审计报告",
+        "en": "Download Audit Report",
+    },
+    "sidebar.report_export_dep_error": {
+        "zh": "缺少报告生成依赖：{exc}。PDF 路径需运行 `pip install weasyprint kaleido` 并安装系统库（macOS: `brew install cairo pango gdk-pixbuf libffi`）；HTML 路径无需额外依赖。",
+        "en": "Missing report generation dependency: {exc}. PDF path requires `pip install weasyprint kaleido` plus system libs (macOS: `brew install cairo pango gdk-pixbuf libffi`); HTML path needs no extra deps.",
+    },
+    "sidebar.report_export_error": {
+        "zh": "报告生成失败：{exc}",
+        "en": "Report generation failed: {exc}",
+    },
     "sidebar.template.company_name": {
         "zh": "示例港股公司",
         "en": "Sample HK Listed Company",

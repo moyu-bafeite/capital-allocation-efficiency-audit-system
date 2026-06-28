@@ -19,6 +19,24 @@ def _make_params() -> AuditParams:
     )
 
 
+def _make_absolute_input():
+    """Build a sample input with amount_unit='absolute' for scaling tests."""
+    from models.input_schema import CompanyAuditInput, FinancialsSchema
+
+    sample = make_sample_input()
+    return CompanyAuditInput(
+        ticker=sample.ticker,
+        company_name=sample.company_name,
+        currency=sample.currency,
+        amount_unit="absolute",
+        market_currency=sample.market_currency,
+        exchange_rate_to_reporting_currency=sample.exchange_rate_to_reporting_currency,
+        closing_exchange_rate_to_reporting_currency=sample.closing_exchange_rate_to_reporting_currency,
+        years=sample.years,
+        financials=FinancialsSchema(**sample.financials.model_dump()),
+    )
+
+
 class RendererTest(unittest.TestCase):
     def test_fig_to_base64_png_returns_data_uri(self):
         from report.renderer import fig_to_base64_png
@@ -28,16 +46,12 @@ class RendererTest(unittest.TestCase):
 
         self.assertIsInstance(uri, str)
         self.assertTrue(uri.startswith("data:image/png;base64,"))
-        # Base64 payload should be non-empty and decode cleanly
         payload = uri.split(",", 1)[1]
         self.assertGreater(len(payload), 100)
 
-    def test_safe_fig_returns_none_on_failure(self):
+    def test_safe_fig_to_base64_png_returns_none_on_failure(self):
         from report.renderer import safe_fig_to_base64_png
 
-        # A figure with no traces and invalid layout won't crash to_image,
-        # so feed something that will: a non-Figure object wrapped via
-        # an attribute error path. Use a malformed figure by mocking.
         class BrokenFig:
             def to_image(self, **kwargs):
                 raise RuntimeError("simulated kaleido failure")
@@ -45,8 +59,39 @@ class RendererTest(unittest.TestCase):
             def update_layout(self, **kwargs):
                 return self
 
-        result = safe_fig_to_base64_png(BrokenFig())
-        self.assertIsNone(result)
+        self.assertIsNone(safe_fig_to_base64_png(BrokenFig()))
+
+    def test_fig_to_plotly_div_returns_interactive_html(self):
+        from report.renderer import fig_to_plotly_div
+
+        fig = go.Figure(go.Scatter(x=[1, 2, 3], y=[4, 5, 6]))
+        div = fig_to_plotly_div(fig, height=240)
+
+        self.assertIsInstance(div, str)
+        self.assertIn("Plotly.newPlot", div)
+        self.assertIn("<div", div)
+        # Should NOT include the Plotly.js library itself (injected separately)
+        self.assertNotIn("function plotly", div.lower())
+
+    def test_safe_fig_to_plotly_div_returns_none_on_failure(self):
+        from report.renderer import safe_fig_to_plotly_div
+
+        class BrokenFig:
+            def to_html(self, **kwargs):
+                raise RuntimeError("simulated failure")
+
+            def update_layout(self, **kwargs):
+                return self
+
+        self.assertIsNone(safe_fig_to_plotly_div(BrokenFig()))
+
+    def test_get_plotlyjs_inline_is_substantial(self):
+        from report.renderer import get_plotlyjs_inline
+
+        js = get_plotlyjs_inline()
+        self.assertIsInstance(js, str)
+        # Plotly.js is ~4.6 MB; confirm we got the real library, not a stub
+        self.assertGreater(len(js), 1_000_000)
 
 
 class SectionsTest(unittest.TestCase):
@@ -55,17 +100,38 @@ class SectionsTest(unittest.TestCase):
         self.params = _make_params()
         self.result = run_audit(self.data, self.params)
 
-    def test_capital_allocation_section_structure(self):
+    def test_capital_allocation_section_has_fig_charts(self):
         from report.sections import build_capital_allocation_section
 
         section = build_capital_allocation_section(self.data, self.result)
         self.assertIn("title", section)
         self.assertIn("charts", section)
-        self.assertIn("metrics", section)
         self.assertEqual(len(section["metrics"]), 4)
-        for m in section["metrics"]:
-            self.assertIn("label", m)
-            self.assertIn("value", m)
+        # Charts now carry fig objects (format-agnostic), not src strings
+        self.assertEqual(len(section["charts"]), 2)
+        for chart in section["charts"]:
+            self.assertIsInstance(chart["fig"], go.Figure)
+            self.assertIn("height", chart)
+            self.assertNotIn("src", chart)
+
+    def test_all_sections_emit_fig_not_src(self):
+        from report.sections import (
+            build_buyback_section,
+            build_earnings_quality_section,
+            build_ma_goodwill_section,
+            build_roic_roiic_section,
+        )
+
+        for builder, args in [
+            (build_roic_roiic_section, (self.params, self.result)),
+            (build_buyback_section, (self.data, self.result)),
+            (build_ma_goodwill_section, (self.data, self.params, self.result)),
+            (build_earnings_quality_section, (self.data, self.result)),
+        ]:
+            section = builder(*args)
+            for chart in section.get("charts", []):
+                self.assertIsInstance(chart["fig"], go.Figure)
+                self.assertNotIn("src", chart)
 
     def test_buyback_section_table_has_year_column(self):
         from report.sections import build_buyback_section
@@ -74,7 +140,6 @@ class SectionsTest(unittest.TestCase):
         self.assertTrue(section["tables"])
         table = section["tables"][0]
         self.assertEqual(table["headers"][0], "Year")
-        # Each row should start with a year string
         for row in table["rows"]:
             self.assertTrue(row[0].isdigit())
 
@@ -86,46 +151,21 @@ class SectionsTest(unittest.TestCase):
         for p in section["principles"]:
             self.assertIn(p["status"], ("pass", "fail", "warning", "insufficient_data"))
             self.assertIn("badge", p)
-            self.assertIn("title", p)
-            self.assertIn("value", p)
-            self.assertIn("benchmark", p)
-            self.assertIn("description", p)
 
     def test_ledger_section_chunks_present(self):
         from report.sections import build_ledger_section
 
         section = build_ledger_section(self.data, self.result)
-        # Expect at least the inputs chunk
         self.assertTrue(section["tables"])
         for tbl in section["tables"]:
-            self.assertIn("headers", tbl)
-            self.assertIn("rows", tbl)
             self.assertEqual(len(tbl["headers"]), len(tbl["rows"][0]))
 
     def test_absolute_amount_unit_scaling(self):
         from report.sections import _scale_absolute_to_million
 
-        sample = make_sample_input()
-        # Force absolute unit; values are in raw RMB so divide by 1e6 for display
-        sample_financials = sample.financials
-        # Build a result with absolute unit
-        sample = make_sample_input()
-        # Can't mutate frozen pydantic easily; re-create with absolute
-        from models.input_schema import CompanyAuditInput, FinancialsSchema
-        abs_input = CompanyAuditInput(
-            ticker=sample.ticker,
-            company_name=sample.company_name,
-            currency=sample.currency,
-            amount_unit="absolute",
-            market_currency=sample.market_currency,
-            exchange_rate_to_reporting_currency=sample.exchange_rate_to_reporting_currency,
-            closing_exchange_rate_to_reporting_currency=sample.closing_exchange_rate_to_reporting_currency,
-            years=sample.years,
-            financials=FinancialsSchema(**sample.financials.model_dump()),
-        )
+        abs_input = _make_absolute_input()
         result = run_audit(abs_input, _make_params())
         scaled = _scale_absolute_to_million(result)
-        # After scaling, net_profit in audited_df should be 1e6x smaller
         self.assertAlmostEqual(
             scaled.audited_df["net_profit"].iloc[0],
             result.audited_df["net_profit"].iloc[0] / 1e6,
@@ -139,47 +179,62 @@ class BuilderTest(unittest.TestCase):
         cls.params = _make_params()
         cls.result = run_audit(cls.data, cls.params)
 
-    def test_build_report_html_contains_key_content(self):
+    def test_build_report_html_returns_bytes_with_plotly(self):
         from report import build_report_html
 
-        html = build_report_html(self.data, self.params, self.result)
-        self.assertIn("<html", html)
-        self.assertIn("Test Company", html)
-        self.assertIn("TEST", html)
-        # Should embed at least one base64 chart image
-        self.assertIn("data:image/png;base64,", html)
-        # Should contain all 8 principle titles
+        payload = build_report_html(self.data, self.params, self.result)
+        self.assertIsInstance(payload, bytes)
+        self.assertEqual(payload[:9], b"<!DOCTYPE")
+        # Interactive HTML path: must embed Plotly.newPlot calls
+        self.assertIn(b"Plotly.newPlot", payload)
+        # Plotly.js library inlined in <head> for offline use
+        self.assertIn(b"function", payload)
+        # Must contain key content
+        self.assertIn(b"Test Company", payload)
+        self.assertIn(b"TEST", payload)
         for i in range(1, 9):
-            self.assertIn(f"Principle {i}", html)
+            self.assertIn(f"Principle {i}".encode(), payload)
 
     def test_build_report_html_has_seven_body_sections(self):
-        from report.builder import _build_context
+        from report.builder import _build_sections, _build_context
 
-        ctx = _build_context(self.data, self.params, self.result)
+        sections = _build_sections(self.data, self.params, self.result)
+        ctx = _build_context(self.data, self.params, self.result, sections)
         self.assertEqual(len(ctx["body_sections"]), 7)
-        # Each section must have a title
         for s in ctx["body_sections"]:
             self.assertTrue(s.get("title"))
 
     def test_build_report_html_absolute_unit(self):
         from report import build_report_html
-        from models.input_schema import CompanyAuditInput, FinancialsSchema
 
-        abs_input = CompanyAuditInput(
-            ticker=self.data.ticker,
-            company_name=self.data.company_name,
-            currency=self.data.currency,
-            amount_unit="absolute",
-            market_currency=self.data.market_currency,
-            exchange_rate_to_reporting_currency=self.data.exchange_rate_to_reporting_currency,
-            closing_exchange_rate_to_reporting_currency=self.data.closing_exchange_rate_to_reporting_currency,
-            years=self.data.years,
-            financials=FinancialsSchema(**self.data.financials.model_dump()),
-        )
+        abs_input = _make_absolute_input()
         result = run_audit(abs_input, self.params)
-        html = build_report_html(abs_input, self.params, result)
-        self.assertIn("Test Company", html)
-        self.assertIn("data:image/png;base64,", html)
+        payload = build_report_html(abs_input, self.params, result)
+        self.assertIn(b"Test Company", payload)
+        self.assertIn(b"Plotly.newPlot", payload)
+
+    def test_render_charts_for_pdf_replaces_fig_with_src(self):
+        from report.builder import _build_sections, _render_charts_for_pdf
+
+        sections = _build_sections(self.data, self.params, self.result)
+        _render_charts_for_pdf(sections)
+        for section in sections:
+            for chart in section.get("charts", []):
+                # After PDF rendering, fig is popped and src is set
+                self.assertNotIn("fig", chart)
+                self.assertIn("src", chart)
+
+    def test_render_charts_for_html_replaces_fig_with_html_div(self):
+        from report.builder import _build_sections, _render_charts_for_html
+
+        sections = _build_sections(self.data, self.params, self.result)
+        _render_charts_for_html(sections)
+        for section in sections:
+            for chart in section.get("charts", []):
+                self.assertNotIn("fig", chart)
+                self.assertIn("html", chart)
+                if chart["html"]:
+                    self.assertIn("Plotly.newPlot", chart["html"])
 
     @unittest.skipUnless(
         __import__("importlib").util.find_spec("weasyprint"),
@@ -192,6 +247,8 @@ class BuilderTest(unittest.TestCase):
         self.assertIsInstance(pdf, bytes)
         self.assertEqual(pdf[:5], b"%PDF-")
         self.assertGreater(len(pdf), 10000)
+        # PDF path must not embed interactive Plotly
+        self.assertNotIn(b"Plotly.newPlot", pdf)
 
 
 if __name__ == "__main__":

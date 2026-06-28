@@ -3,7 +3,7 @@ import streamlit as st
 from i18n import t
 from services.audit_pipeline import run_audit
 from ui.sections import render_navigation, render_selected_section, render_summary
-from ui.sidebar import render_sidebar, render_pdf_export_button
+from ui.sidebar import render_sidebar, render_report_export_button
 
 
 def configure_page() -> None:
@@ -192,7 +192,7 @@ def main() -> None:
         st.error(f"❌ 审计模型运行失败：{exc}")
         st.stop()
 
-    render_pdf_export_button(data, params, result)
+    render_report_export_button(data, params, result)
 
     col_nav, col_spacer = st.columns([1, 2])
     with col_nav:

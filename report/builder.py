@@ -1,21 +1,33 @@
-"""
-PDF report builder: assembles audit results into a printable PDF.
+"""Audit report builder: assembles audit results into PDF or interactive HTML.
 
-Public entry point is :func:`build_report`, which accepts the same trio of
-objects the UI consumes (``data``, ``params``, ``result``) and returns the
-PDF as ``bytes`` ready for ``st.download_button``.
+Public entry points:
+
+* :func:`build_report` — PDF via WeasyPrint (archival/printable; needs system libs).
+* :func:`build_report_html` — self-contained interactive HTML with embedded
+  Plotly.js (zero system dependencies; charts are hoverable/zoomable).
+
+Both consume the same trio the UI uses (``data``, ``params``, ``result``) and
+share the same section builders. The only divergence is the chart rendering
+step: PDF rasterizes figures to base64 PNG via kaleido; HTML embeds live
+Plotly divs with the library inlined once in ``<head>``.
 """
 
 from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any, Dict, List
 
-from i18n import LANGUAGES, LANGUAGE_LABELS, get_lang, resolve, t
+from i18n import LANGUAGE_LABELS, get_lang, resolve, t
 from models.input_schema import CompanyAuditInput
 from services.audit_pipeline import AuditParams, AuditResult
 
+from report.renderer import (
+    get_plotlyjs_inline,
+    kaleido_server,
+    safe_fig_to_base64_png,
+    safe_fig_to_plotly_div,
+)
 from report.sections import (
     build_buyback_section,
     build_capital_allocation_section,
@@ -27,35 +39,82 @@ from report.sections import (
     build_roic_roiic_section,
     _scale_absolute_to_million,
 )
-from report.renderer import kaleido_server
 from report.template import render_html
 
 logger = logging.getLogger(__name__)
 
 
 def _safe_set_lang() -> str:
-    """Activate the current session language (or default) and return its code.
-
-    ``get_lang`` already reads Streamlit session state; we just ensure the
-    translations module uses the active language. Outside a Streamlit run
-    (e.g. unit tests), it falls back to ``DEFAULT_LANG``.
-    """
+    """Activate the current session language (or default) and return its code."""
     return get_lang()
+
+
+def _build_sections(
+    data: CompanyAuditInput,
+    params: AuditParams,
+    effective_result: AuditResult,
+) -> List[Dict[str, Any]]:
+    """Build the seven body sections with format-agnostic chart figs.
+
+    Sections emit ``{"fig": go.Figure, "height": int, ...}`` dicts; the
+    format-specific rendering (PNG vs interactive div) happens later in
+    :func:`_render_charts_for_pdf` / :func:`_render_charts_for_html`.
+    """
+    return [
+        build_capital_allocation_section(data, effective_result),
+        build_roic_roiic_section(params, effective_result),
+        build_buyback_section(data, effective_result),
+        build_ma_goodwill_section(data, params, effective_result),
+        build_earnings_quality_section(data, effective_result),
+        build_checklist_section(effective_result),
+        build_ledger_section(data, effective_result),
+    ]
+
+
+def _render_charts_for_pdf(sections: List[Dict[str, Any]]) -> None:
+    """Mutate sections in place: replace ``fig`` with rasterized ``src`` (PNG).
+
+    Wrapped in :func:`kaleido_server` to keep one Chromium instance alive
+    across all charts (~5s total instead of ~90s).
+    """
+    with kaleido_server():
+        for section in sections:
+            for chart in section.get("charts", []):
+                fig = chart.pop("fig", None)
+                height = chart.get("height", 480)
+                if fig is None:
+                    continue
+                src = safe_fig_to_base64_png(fig, height=height)
+                if src:
+                    chart["src"] = src
+                else:
+                    chart["src"] = None
+                    chart["_failed"] = True
+
+
+def _render_charts_for_html(sections: List[Dict[str, Any]]) -> None:
+    """Mutate sections in place: replace ``fig`` with interactive ``html`` div."""
+    for section in sections:
+        for chart in section.get("charts", []):
+            fig = chart.pop("fig", None)
+            height = chart.get("height", 480)
+            if fig is None:
+                continue
+            div = safe_fig_to_plotly_div(fig, height=height)
+            if div:
+                chart["html"] = div
+            else:
+                chart["html"] = None
+                chart["_failed"] = True
 
 
 def _build_context(
     data: CompanyAuditInput,
     params: AuditParams,
     result: AuditResult,
+    sections: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
     lang = _safe_set_lang()
-
-    # Scale absolute-unit monetary fields to millions for display consistency
-    effective_result = (
-        _scale_absolute_to_million(result)
-        if data.amount_unit == "absolute"
-        else result
-    )
 
     checklist = result.checklist
     counts = {
@@ -66,25 +125,12 @@ def _build_context(
     }
     summary_text = resolve(checklist["summary"])
 
-    # All chart rendering happens inside section builders; keep a single
-    # kaleido Chromium instance alive across the whole batch to avoid the
-    # ~15s per-chart subprocess startup tax.
-    with kaleido_server():
-        body_sections = [
-            build_capital_allocation_section(data, effective_result),
-            build_roic_roiic_section(params, effective_result),
-            build_buyback_section(data, effective_result),
-            build_ma_goodwill_section(data, params, effective_result),
-            build_earnings_quality_section(data, effective_result),
-            build_checklist_section(effective_result),
-            build_ledger_section(data, effective_result),
-        ]
-
     years_range = f"{data.years[0]} - {data.years[-1]}"
     amount_unit_label = t("metric.unit.absolute") if data.amount_unit == "absolute" else data.amount_unit
 
     return {
         # Cover
+        "eyebrow": t("app.nav_caption"),
         "report_title": t("app.title"),
         "company_name": data.company_name,
         "ticker": data.ticker,
@@ -106,14 +152,14 @@ def _build_context(
         "checklist_intro": _md_strip(t("section.checklist.intro")),
         "counts": counts,
         # Body
-        "body_sections": body_sections,
+        "body_sections": sections,
         # Appendix
         "appendix_title": t("sidebar.params_header"),
         "appendix_intro": t("sidebar.params.section1").split(".")[0].lstrip("123. "),
         "params": build_params_appendix(params),
         "disclaimer_1": t("section.checklist.disclaimer1"),
         "disclaimer_2": t("section.checklist.disclaimer2"),
-        # Labels shared with CSS @page boxes (kept simple)
+        # Labels shared with CSS @page boxes
         "labels": {
             "company": t("metric.label.company"),
             "years": t("metric.label.years"),
@@ -128,6 +174,8 @@ def _build_context(
             "param": "Parameter",
             "value": "Value",
         },
+        # Plotly.js is injected only by the HTML path; PDF path leaves this None
+        "plotly_js": None,
     }
 
 
@@ -155,8 +203,16 @@ def build_report(
             "(cairo, pango, gdk-pixbuf) — see README."
         ) from exc
 
-    context = _build_context(data, params, result)
-    html = render_html(context)
+    effective_result = (
+        _scale_absolute_to_million(result)
+        if data.amount_unit == "absolute"
+        else result
+    )
+    sections = _build_sections(data, params, effective_result)
+    _render_charts_for_pdf(sections)
+
+    context = _build_context(data, params, result, sections)
+    html = render_html(context, mode="print")
     pdf_bytes = HTML(string=html, base_url=".").write_pdf()
     return pdf_bytes
 
@@ -165,7 +221,23 @@ def build_report_html(
     data: CompanyAuditInput,
     params: AuditParams,
     result: AuditResult,
-) -> str:
-    """Build only the HTML (useful for debugging / previewing in a browser)."""
-    context = _build_context(data, params, result)
-    return render_html(context)
+) -> bytes:
+    """Build a self-contained interactive HTML report and return it as bytes.
+
+    The HTML embeds Plotly.js inline (~4.6 MB) so it works offline. Charts
+    are live Plotly divs (hover/zoom/legend-toggle). Zero system dependencies
+    beyond what Streamlit already requires.
+    """
+    effective_result = (
+        _scale_absolute_to_million(result)
+        if data.amount_unit == "absolute"
+        else result
+    )
+    sections = _build_sections(data, params, effective_result)
+    _render_charts_for_html(sections)
+
+    context = _build_context(data, params, result, sections)
+    # Inject Plotly.js once in <head> for all charts to share
+    context["plotly_js"] = get_plotlyjs_inline()
+    html = render_html(context, mode="screen")
+    return html.encode("utf-8")

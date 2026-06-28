@@ -1,9 +1,13 @@
 """
-Build section context dicts for the PDF report template.
+Build section context dicts for the audit report template.
 
 Each function mirrors the corresponding ``ui/sections.py`` render function
 but returns plain data (dicts/lists) instead of issuing Streamlit calls.
 The template in :mod:`report.template` consumes these structures.
+
+Charts are emitted as ``{"fig": go.Figure, ...}`` dicts — format-agnostic.
+The builder layer is responsible for rasterizing to PNG (PDF path) or
+embedding an interactive Plotly div (HTML path).
 
 The amount_unit=="absolute" scaling logic mirrors
 :func:`ui.sections.render_selected_section` (divide by 1e6 for display).
@@ -29,8 +33,6 @@ from ui.charts import (
     create_roic_chart,
     create_waterfall_chart,
 )
-
-from report.renderer import safe_fig_to_base64_png
 
 
 # ---------------------------------------------------------------------------
@@ -113,14 +115,11 @@ def build_capital_allocation_section(
 
     wf_fig = create_waterfall_chart(waterfall_data, start_year, end_year)
     pie_fig = create_allocation_pie_chart(waterfall_data)
-    wf_src = safe_fig_to_base64_png(wf_fig)
-    pie_src = safe_fig_to_base64_png(pie_fig, height=320)
 
-    charts = []
-    if wf_src:
-        charts.append({"src": wf_src, "alt": "Capital allocation waterfall", "caption": None})
-    if pie_src:
-        charts.append({"src": pie_src, "alt": "Allocation composition", "caption": t("section.capital.composition_rate")})
+    charts = [
+        {"fig": wf_fig, "height": 480, "alt": "Capital allocation waterfall", "caption": None},
+        {"fig": pie_fig, "height": 320, "alt": "Allocation composition", "caption": t("section.capital.composition_rate")},
+    ]
 
     metrics = [
         {"label": t("section.capital.metric.capex_to_ocf"), "value": _fmt_pct(waterfall_data["CapEx"], total_ocf), "help": t("section.capital.metric.capex_to_ocf_help")},
@@ -154,7 +153,6 @@ def build_roic_roiic_section(params: AuditParams, result: AuditResult) -> Dict[s
         params.roiic_window_2,
         params.roiic_retained_lag,
     )
-    src = safe_fig_to_base64_png(fig)
 
     return {
         "title": t("section.roic.title"),
@@ -163,7 +161,7 @@ def build_roic_roiic_section(params: AuditParams, result: AuditResult) -> Dict[s
             _strip_markdown(t("section.roic.intro.bullet1")),
             _strip_markdown(t("section.roic.intro.bullet2")),
         ],
-        "charts": [{"src": src, "alt": "ROIC vs ROIIC trend", "caption": None}] if src else [],
+        "charts": [{"fig": fig, "height": 480, "alt": "ROIC vs ROIIC trend", "caption": None}],
         "guidance_header": _strip_markdown(t("section.roic.guidance.header")),
         "guidance_bullets": [
             _strip_markdown(t("section.roic.guidance.bullet1")),
@@ -185,7 +183,6 @@ def build_buyback_section(data: CompanyAuditInput, result: AuditResult) -> Dict[
     display_df["buybacks_paid_market_currency"] = display_df["buybacks_paid"] / fx_rate
 
     chart_fig = create_buyback_chart(display_df, data.market_currency)
-    src = safe_fig_to_base64_png(chart_fig)
 
     # Detail table
     audit_df = display_df[
@@ -234,7 +231,7 @@ def build_buyback_section(data: CompanyAuditInput, result: AuditResult) -> Dict[
         "title": t("section.buyback.title"),
         "intro": _strip_markdown(t("section.buyback.intro")),
         "bullets": [],
-        "charts": [{"src": src, "alt": "Buyback audit chart", "caption": None}] if src else [],
+        "charts": [{"fig": chart_fig, "height": 480, "alt": "Buyback audit chart", "caption": None}],
         "tables": [table],
     }
 
@@ -250,7 +247,6 @@ def build_ma_goodwill_section(data: CompanyAuditInput, params: AuditParams, resu
         result.audited_df, acq_col_1, acq_col_2,
         params.roiic_window_1, params.roiic_window_2, params.roiic_retained_lag,
     )
-    src = safe_fig_to_base64_png(fig)
 
     df = result.audited_df
     ma_total = float(df["ma_paid"].sum()) if "ma_paid" in df.columns else 0.0
@@ -284,7 +280,7 @@ def build_ma_goodwill_section(data: CompanyAuditInput, params: AuditParams, resu
             _strip_markdown(t("section.ma.intro.bullet3")),
         ],
         "alert": alert,
-        "charts": [{"src": src, "alt": "M&A and goodwill chart", "caption": None}] if src else [],
+        "charts": [{"fig": fig, "height": 480, "alt": "M&A and goodwill chart", "caption": None}],
         "metrics_header": t("section.capital.diagnostics"),
         "metrics": metrics,
         "guidance_header": _strip_markdown(t("section.ma.guidance.header")),
@@ -301,7 +297,6 @@ def build_ma_goodwill_section(data: CompanyAuditInput, params: AuditParams, resu
 
 def build_earnings_quality_section(data: CompanyAuditInput, result: AuditResult) -> Dict[str, Any]:
     fig = create_earnings_quality_chart(result.audited_df)
-    src = safe_fig_to_base64_png(fig)
 
     df = result.audited_df
     recent = df.tail(5)
@@ -340,7 +335,7 @@ def build_earnings_quality_section(data: CompanyAuditInput, result: AuditResult)
         "title": t("section.eq.title"),
         "intro": t("section.eq.intro"),
         "bullets": bullets,
-        "charts": [{"src": src, "alt": "Earnings quality chart", "caption": None}] if src else [],
+        "charts": [{"fig": fig, "height": 480, "alt": "Earnings quality chart", "caption": None}],
         "metrics_header": t("section.capital.diagnostics"),
         "metrics": metrics,
         "guidance_header": _strip_markdown(t("section.eq.guidance.header")),

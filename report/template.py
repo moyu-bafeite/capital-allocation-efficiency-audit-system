@@ -1,7 +1,15 @@
-"""
-Jinja2 HTML template and CSS for the PDF audit report.
+"""Jinja2 HTML template and CSS for the audit report.
 
-The styling mirrors the "old-money" Courier Prime aesthetic from ``app.py``:
+Two CSS variants share the same Jinja template:
+
+* ``PRINT_CSS``  — A4 page margins, 9pt font, ``page-break-*`` rules. Used by
+  the PDF path (WeasyPrint). Charts render as static ``<img src="data:...">``.
+* ``SCREEN_CSS`` — centered 920px container, 11pt font, no ``@page`` margin,
+  responsive layout. Used by the interactive HTML report path. Charts render
+  as live Plotly ``<div>`` blocks with the Plotly.js library inlined once in
+  ``<head>`` (~4.6 MB, offline-capable).
+
+Both variants mirror the "old-money" Courier Prime aesthetic from ``app.py``:
 flat 1px borders, no shadows, hairline greys, monospace numerals. CJK text
 falls back to system fonts (Hiragino Sans GB on macOS, Noto Sans CJK on Linux).
 """
@@ -11,27 +19,14 @@ from __future__ import annotations
 from jinja2 import Template
 
 # ---------------------------------------------------------------------------
-# CSS
+# Shared base CSS (rules common to both print and screen)
 # ---------------------------------------------------------------------------
 
-REPORT_CSS = """
-@page {
-    size: A4;
-    margin: 1.5cm 1.5cm 1.5cm 1.5cm;
-    @bottom-center {
-        content: counter(page) " / " counter(pages);
-        font-family: "Courier Prime", "Courier New", monospace;
-        font-size: 0.7rem;
-        color: rgba(40, 40, 40, 0.5);
-        padding-top: 6pt;
-    }
-}
-
+_BASE_CSS = """
 html, body {
     font-family: "Courier Prime", "Courier New", "Hiragino Sans GB",
                  "Noto Sans CJK SC", "STHeiti", "PingFang SC", monospace;
     color: #1a1a1a;
-    font-size: 9pt;
     line-height: 1.55;
     margin: 0;
     padding: 0;
@@ -39,7 +34,6 @@ html, body {
 
 /* ── Cover ───────────────────────────────────────────────────────────── */
 .cover {
-    page-break-after: always;
     padding-top: 3cm;
     text-align: left;
 }
@@ -49,7 +43,7 @@ html, body {
     background: rgba(40, 40, 40, 0.4);
     margin: 0.6cm 0 1.2cm 0;
 }
-.cover {
+.cover .eyebrow {
     font-size: 0.7rem;
     letter-spacing: 0.35em;
     text-transform: uppercase;
@@ -106,12 +100,8 @@ h3.subsection {
     margin: 0.5cm 0 0.25cm 0;
     opacity: 0.85;
 }
-.section {
-    page-break-inside: auto;
-}
-.section-break {
-    break-before: page;
-}
+.section { page-break-inside: auto; }
+.section-break { break-before: page; }
 p { margin: 0.3cm 0; }
 .intro { margin-bottom: 0.4cm; opacity: 0.85; }
 .bullet { margin: 0.15cm 0 0.15cm 0.4cm; opacity: 0.85; }
@@ -120,12 +110,12 @@ p { margin: 0.3cm 0; }
 .metric-grid {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.4cm;
+    gap: 0.3cm;
     margin: 0.3cm 0 0.5cm 0;
 }
 .metric-card {
-    flex: 1 1 22%;
-    min-width: 22%;
+    flex: 1 1 0;
+    min-width: 0;
     border: 1px solid rgba(128, 128, 128, 0.25);
     border-radius: 0;
     padding: 0.5rem 0.6rem;
@@ -158,10 +148,9 @@ p { margin: 0.3cm 0; }
     page-break-inside: avoid;
 }
 .chart-block img {
-    width: 100%;
-    max-width: 120%;
-    height: 100%;
-    max-height: 120%;
+    width: 80%;
+    max-width: 100%;
+    height: auto;
 }
 .chart-caption {
     font-size: 0.7rem;
@@ -170,6 +159,15 @@ p { margin: 0.3cm 0; }
 }
 
 /* ── Tables ──────────────────────────────────────────────────────────── */
+.table-scroll {
+    overflow-x: auto;
+    margin: 0.3cm 0 0.5cm 0;
+}
+.table-scroll table.data-table {
+    margin: 0;
+    width: auto;
+    min-width: 100%;
+}
 table.data-table {
     width: 100%;
     border-collapse: collapse;
@@ -194,9 +192,7 @@ table.data-table td.label-col,
 table.data-table th.label-col {
     text-align: left;
 }
-table.data-table tr {
-    page-break-inside: avoid;
-}
+table.data-table tr { page-break-inside: avoid; }
 
 /* ── Checklist principles ────────────────────────────────────────────── */
 .principle {
@@ -213,10 +209,7 @@ table.data-table tr {
     font-size: 0.8rem;
     margin: 0.15cm 0;
 }
-.principle .facts .label {
-    opacity: 0.6;
-    margin-right: 0.2cm;
-}
+.principle .facts .label { opacity: 0.6; margin-right: 0.2cm; }
 .principle .facts strong { font-weight: 700; }
 .principle .desc {
     font-size: 0.78rem;
@@ -309,6 +302,74 @@ hr.thin {
 """
 
 # ---------------------------------------------------------------------------
+# Print CSS (PDF path) — A4 page margins + page-break rules
+# ---------------------------------------------------------------------------
+
+PRINT_CSS = """
+@page {
+    size: A4;
+    margin: 1.5cm 1.5cm 1.5cm 1.5cm;
+    @bottom-center {
+        content: counter(page) " / " counter(pages);
+        font-family: "Courier Prime", "Courier New", monospace;
+        font-size: 0.7rem;
+        color: rgba(40, 40, 40, 0.5);
+        padding-top: 6pt;
+    }
+}
+""" + _BASE_CSS + """
+/* PDF-specific: cover always starts a new page */
+.cover { page-break-after: always; }
+"""
+
+# ---------------------------------------------------------------------------
+# Screen CSS (interactive HTML path) — centered container, larger font
+# ---------------------------------------------------------------------------
+
+SCREEN_CSS = _BASE_CSS + """
+/* Screen-specific overrides */
+html, body {
+    font-size: 11pt;
+    background: #fafafa;
+}
+
+.page-container {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 1.5cm 1.2cm;
+    background: white;
+    box-shadow: 0 0 1px rgba(0,0,0,0.08);
+    min-height: 100vh;
+}
+
+/* Cover: no forced page break on screen */
+.cover { padding-top: 1cm; }
+.cover .footer-note { margin-top: 1.5cm; }
+
+/* Section breaks: visual separation instead of page breaks on screen */
+.section-break { break-before: auto; margin-top: 1.2cm; }
+.section {
+    border-top: 1px solid rgba(128, 128, 128, 0.15);
+    padding-top: 0.4cm;
+}
+.section:first-of-type { border-top: none; padding-top: 0; }
+
+/* Plotly interactive charts: full width, centered */
+.chart-block img { width: 100%; }
+.js-plotly-plot { margin: 0 auto; }
+
+/* Print fallback: when user hits Ctrl+P, restore page-break behavior */
+@media print {
+    .page-container { max-width: none; padding: 0; box-shadow: none; }
+    html, body { font-size: 9pt; background: white; }
+    .cover { page-break-after: always; padding-top: 2cm; }
+    .section-break { break-before: page; margin-top: 0; }
+    .section { border-top: none; padding-top: 0; }
+    @page { margin: 1.5cm; }
+}
+"""
+
+# ---------------------------------------------------------------------------
 # Jinja2 template
 # ---------------------------------------------------------------------------
 
@@ -317,13 +378,17 @@ REPORT_TEMPLATE = Template(
 <html lang="{{ lang }}">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{ report_title }} - {{ company_name }}</title>
 <style>{{ css }}</style>
+{% if plotly_js %}<script>{{ plotly_js }}</script>{% endif %}
 </head>
 <body>
+<div class="page-container">
 
 <!-- ════════════════════════ COVER ════════════════════════ -->
 <section class="cover">
+    <p class="eyebrow">{{ eyebrow }}</p>
     <h1>{{ report_title }}</h1>
     <p class="subtitle">{{ company_name }} · {{ ticker }}</p>
     <div class="ruler"></div>
@@ -335,19 +400,19 @@ REPORT_TEMPLATE = Template(
         <tr><td class="label">{{ labels.generated_at }}</td><td>{{ generated_at }}</td></tr>
         <tr><td class="label">{{ labels.language }}</td><td>{{ language_label }}</td></tr>
     </table>
-    <p class="footer-note">{{ footer_note }}</p>
 </section>
 
 <!-- ════════════════════════ SECTIONS ════════════════════════ -->
 {% for section in body_sections %}
-<section class="section{% if loop.index > 1 %} section-break{% endif %}">
+<section class="section section-break">
     <h2 class="section-title">{{ section.title }}</h2>
     {% if section.intro %}<p class="intro">{{ section.intro }}</p>{% endif %}
     {% for bullet in section.bullets %}<p class="bullet">{{ bullet }}</p>{% endfor %}
     {% if section.alert %}<div class="alert alert-{{ section.alert.kind }}">{{ section.alert.text }}</div>{% endif %}
     {% for chart in section.charts %}
         <div class="chart-block">
-            <img src="{{ chart.src }}" alt="{{ chart.alt }}">
+            {% if chart.html %}{{ chart.html | safe }}{% endif %}
+            {% if chart.src %}<img src="{{ chart.src }}" alt="{{ chart.alt }}">{% endif %}
             {% if chart.caption %}<div class="chart-caption">{{ chart.caption }}</div>{% endif %}
         </div>
     {% endfor %}
@@ -366,6 +431,7 @@ REPORT_TEMPLATE = Template(
     {% if section.tables %}
         {% for tbl in section.tables %}
         {% if tbl.caption %}<h3 class="subsection">{{ tbl.caption }}</h3>{% endif %}
+        <div class="table-scroll">
         <table class="data-table">
             <thead><tr>
                 {% for h in tbl.headers %}<th{% if loop.first %} class="label-col"{% endif %}>{{ h }}</th>{% endfor %}
@@ -378,6 +444,7 @@ REPORT_TEMPLATE = Template(
                 {% endfor %}
             </tbody>
         </table>
+        </div>
         {% endfor %}
     {% endif %}
     {% for principle in section.principles %}
@@ -423,12 +490,21 @@ REPORT_TEMPLATE = Template(
     </div>
 </section>
 
+</div>
 </body>
 </html>
 """
 )
 
 
-def render_html(context: dict) -> str:
-    """Render the full HTML document from a context dict."""
-    return REPORT_TEMPLATE.render(css=REPORT_CSS, **context)
+def render_html(context: dict, mode: str = "print") -> str:
+    """Render the full HTML document from a context dict.
+
+    Args:
+        context: Template variables. Must include ``plotly_js`` (str or None)
+            and per-chart ``src`` (PDF) or ``html`` (interactive) fields.
+        mode: ``"print"`` uses :data:`PRINT_CSS` (A4, 9pt, page-breaks);
+            ``"screen"`` uses :data:`SCREEN_CSS` (centered, 11pt, responsive).
+    """
+    css = SCREEN_CSS if mode == "screen" else PRINT_CSS
+    return REPORT_TEMPLATE.render(css=css, **context)
