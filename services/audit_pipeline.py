@@ -39,7 +39,7 @@ def run_audit(data: CompanyAuditInput, params: AuditParams) -> AuditResult:
     Run the full automated capital allocation audit workflow.
     """
     if params.wacc <= params.terminal_growth:
-        raise ValueError("折现率 WACC 必须大于永续增长率。")
+        raise ValueError("WACC must be greater than the terminal growth rate.")
 
     calculator = FinancialCalculator(data, maintenance_capex_ratio=params.maintenance_capex_ratio)
     processed_df = calculator.get_processed_df(

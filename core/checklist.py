@@ -3,6 +3,8 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 import pandas as pd
 
+from i18n import Translatable
+
 
 def _latest_longest_window_value(
     df: pd.DataFrame, prefix: str
@@ -24,15 +26,15 @@ def _latest_longest_window_value(
 
 def _build_principle(
     index: int,
-    title: str,
+    title_key: str,
     status: str,
     value: Any,
     benchmark: Any,
-    description: str,
+    description: Translatable,
 ) -> Dict[str, Any]:
     return {
         "index": index,
-        "title": title,
+        "title_key": title_key,
         "status": status,
         "value": value,
         "benchmark": benchmark,
@@ -62,41 +64,36 @@ def generate_checklist(
     if pd.isna(avg_roic):
         p1 = _build_principle(
             1,
-            "资本回报率是否高于资本成本？",
+            "checklist.p1.title",
             "insufficient_data",
             "N/A",
             f"WACC {wacc:.1%}",
-            "ROIC 数据不足，无法判断是否创造价值。",
+            Translatable("checklist.p1.desc.insufficient"),
         )
     elif np.isinf(avg_roic) or (avg_roic > 10.0):
         status = "pass"
-        desc = (
-            "公司近 5 年平均投入资本为负或零，且税后经营利润 (NOPAT) 持续为正。"
-            "这意味着公司不需要股东与债权人投入额外本金，便能靠经营性负债与丰沛现金流运转（零/负投入资本扩张），"
-            "属于商业壁垒极高的特许经营“印钞机”型公司，其资本效率极高，回报率视为无限大！"
-        )
         p1 = _build_principle(
             1,
-            "资本回报率是否高于资本成本？",
+            "checklist.p1.title",
             status,
-            "极高 (Negative IC)",
+            Translatable("checklist.p1.value.negative_ic"),
             f"WACC {wacc:.1%}",
-            desc,
+            Translatable("checklist.p1.desc.money_printer"),
         )
     else:
         spread = avg_roic - wacc
         if spread > 0:
             status = "pass"
-            desc = f"近 5 年平均 ROIC {avg_roic:.1%} 高于 WACC {wacc:.1%}，利差 +{spread:.1%}，公司持续创造经济价值。"
+            desc = Translatable("checklist.p1.desc.pass", avg_roic=avg_roic, wacc=wacc, spread=spread)
         else:
             status = "fail"
-            desc = f"近 5 年平均 ROIC {avg_roic:.1%} 低于 WACC {wacc:.1%}，利差 {spread:.1%}，公司在毁灭股东价值。"
+            desc = Translatable("checklist.p1.desc.fail", avg_roic=avg_roic, wacc=wacc, spread=spread)
         p1 = _build_principle(
             1,
-            "资本回报率是否高于资本成本？",
+            "checklist.p1.title",
             status,
             f"{avg_roic:.1%}",
-            f"WACC {wacc:.1%}（利差 {spread:+.1%}）",
+            Translatable("checklist.p1.benchmark.wacc_spread", wacc=wacc, spread=spread),
             desc,
         )
 
@@ -112,64 +109,47 @@ def generate_checklist(
     if pd.isna(latest_roiic) and pd.isna(avg_roic):
         p2 = _build_principle(
             2,
-            "留存利润是否被高效再投资？",
+            "checklist.p2.title",
             "insufficient_data",
             "N/A",
             f"ROIC {avg_roic:.1%}" if not pd.isna(avg_roic) else "N/A",
-            "ROIIC 数据不足，无法评估增量再投资效率。",
+            Translatable("checklist.p2.desc.insufficient"),
         )
     else:
-        # Determine benchmark string
-        benchmark_str = "ROIC 极高 (Negative IC)" if np.isinf(avg_roic) else f"ROIC {avg_roic:.1%}"
+        benchmark_str: Any = (
+            Translatable("checklist.p2.benchmark.negative_ic")
+            if np.isinf(avg_roic)
+            else f"ROIC {avg_roic:.1%}"
+        )
 
         if np.isinf(latest_roiic):
             status = "pass"
-            val_str = "极高 (Capital-Light)"
-            desc = (
-                f"公司在过去 {roiic_window} 年累计未留下任何盈余（可能全部用于分红与回购），"
-                f"但税后经营利润 (NOPAT) 仍然实现了增长。这代表了极其优异的“零资本 / 轻资产扩张模式”，"
-                f"边际增量再投资效率极高！"
-            )
+            val_str: Any = Translatable("checklist.p2.value.capital_light")
+            desc = Translatable("checklist.p2.desc.capital_light", window=roiic_window)
         elif np.isinf(avg_roic):
-            # If base ROIC is infinite, as long as latest_roiic >= wacc, it is a pass
             if latest_roiic >= wacc:
                 status = "pass"
                 val_str = f"{latest_roiic:.1%}"
-                desc = (
-                    f"虽然因存量投入资本为负使得存量 ROIC 视为无限大，但公司增量再投资回报率 (ROIIC) "
-                    f"达到 {latest_roiic:.1%}，远高于 WACC {wacc:.1%}，管理层的增量资金部署依然极其高效。"
-                )
+                desc = Translatable("checklist.p2.desc.inf_roic_pass", roiic=latest_roiic, wacc=wacc)
             else:
                 status = "fail"
                 val_str = f"{latest_roiic:.1%}"
-                desc = (
-                    f"虽然存量 ROIC 视为无限大，但公司增量再投资回报率 (ROIIC) 仅为 {latest_roiic:.1%}，"
-                    f"低于资本成本 WACC {wacc:.1%}，说明留存利润的边际使用效率低下，应加大分红或回购。"
-                )
+                desc = Translatable("checklist.p2.desc.inf_roic_fail", roiic=latest_roiic, wacc=wacc)
         elif latest_roiic >= avg_roic:
             status = "pass"
             val_str = f"{latest_roiic:.1%}"
-            desc = (
-                f"ROIIC {latest_roiic:.1%} ≥ ROIC {avg_roic:.1%}，"
-                f"增量投资回报不低于存量资本，管理层仍能找到高回报投资机会。"
-            )
+            desc = Translatable("checklist.p2.desc.ge_avg", roiic=latest_roiic, roic=avg_roic)
         elif latest_roiic >= wacc:
             status = "warning"
             val_str = f"{latest_roiic:.1%}"
-            desc = (
-                f"ROIIC {latest_roiic:.1%} < ROIC {avg_roic:.1%}，边际效率递减，"
-                f"但仍高于 WACC {wacc:.1%}，再投资仍在创造价值但护城河可能收窄。"
-            )
+            desc = Translatable("checklist.p2.desc.ge_wacc", roiic=latest_roiic, roic=avg_roic, wacc=wacc)
         else:
             status = "fail"
             val_str = f"{latest_roiic:.1%}"
-            desc = (
-                f"ROIIC {latest_roiic:.1%} < WACC {wacc:.1%}，"
-                f"增量投资回报低于资本成本，管理层在低效扩张，应转向分红或回购。"
-            )
+            desc = Translatable("checklist.p2.desc.lt_wacc", roiic=latest_roiic, wacc=wacc)
         p2 = _build_principle(
             2,
-            "留存利润是否被高效再投资？",
+            "checklist.p2.title",
             status,
             val_str,
             benchmark_str,
@@ -188,34 +168,25 @@ def generate_checklist(
     if pd.isna(latest_one_dollar):
         p3 = _build_principle(
             3,
-            "每 $1 留存是否创造 >$1 市值？",
+            "checklist.p3.title",
             "insufficient_data",
             "N/A",
             "$1.00 / $1",
-            "一美元原则数据不足，无法评估市值创造效率。",
+            Translatable("checklist.p3.desc.insufficient"),
         )
     else:
         if latest_one_dollar >= 1.0:
             status = "pass"
-            desc = (
-                f"每留存 $1 创造了 ${latest_one_dollar:.2f} 市值，"
-                f"市场对管理层的资本配置投出信任票。"
-            )
+            desc = Translatable("checklist.p3.desc.pass", value=latest_one_dollar)
         elif latest_one_dollar >= 0.5:
             status = "warning"
-            desc = (
-                f"每留存 $1 仅创造 ${latest_one_dollar:.2f} 市值，"
-                f"留存利润的市场认可度不足，资本配置效率存疑。"
-            )
+            desc = Translatable("checklist.p3.desc.warning", value=latest_one_dollar)
         else:
             status = "fail"
-            desc = (
-                f"每留存 $1 仅创造 ${latest_one_dollar:.2f} 市值，"
-                f"管理层截留利润却未能转化为市场价值，严重摧毁股东财富。"
-            )
+            desc = Translatable("checklist.p3.desc.fail", value=latest_one_dollar)
         p3 = _build_principle(
             3,
-            "每 $1 留存是否创造 >$1 市值？",
+            "checklist.p3.title",
             status,
             f"${latest_one_dollar:.2f} / $1",
             "$1.00 / $1",
@@ -230,11 +201,11 @@ def generate_checklist(
         avg_buyback_ratio = np.nan
         p4 = _build_principle(
             4,
-            "回购是否具有纪律性（低于内在价值）？",
+            "checklist.p4.title",
             "insufficient_data",
             "N/A",
-            "≤ 0.85x 内在价值",
-            "审计期间无显著回购记录，无法评估回购纪律。",
+            Translatable("checklist.p4.benchmark.le_085"),
+            Translatable("checklist.p4.desc.insufficient"),
         )
     else:
         buyback_weights = df.loc[buyback_ratios.index, "buybacks_paid"].clip(lower=0)
@@ -245,28 +216,19 @@ def generate_checklist(
 
         if avg_buyback_ratio <= 0.85:
             status = "pass"
-            desc = (
-                f"加权回购均价为内在价值的 {avg_buyback_ratio:.2f}x，"
-                f"管理层在低估时回购，实实在在地增厚长期股东权益。"
-            )
+            desc = Translatable("checklist.p4.desc.pass", ratio=avg_buyback_ratio)
         elif avg_buyback_ratio <= 1.10:
             status = "warning"
-            desc = (
-                f"加权回购均价为内在价值的 {avg_buyback_ratio:.2f}x，"
-                f"回购价格接近公允价值，未造成重大价值损失但也未创造显著超额回报。"
-            )
+            desc = Translatable("checklist.p4.desc.warning", ratio=avg_buyback_ratio)
         else:
             status = "fail"
-            desc = (
-                f"加权回购均价为内在价值的 {avg_buyback_ratio:.2f}x，"
-                f"管理层在高估时回购，用真金白银补贴离场股东，损害长期持有者利益。"
-            )
+            desc = Translatable("checklist.p4.desc.fail", ratio=avg_buyback_ratio)
         p4 = _build_principle(
             4,
-            "回购是否具有纪律性（低于内在价值）？",
+            "checklist.p4.title",
             status,
-            f"{avg_buyback_ratio:.2f}x 内在价值",
-            "≤ 0.85x",
+            Translatable("checklist.p4.value.ratio", ratio=avg_buyback_ratio),
+            "\u2264 0.85x",
             desc,
         )
 
@@ -280,48 +242,39 @@ def generate_checklist(
         fcf_payout_ratio = np.nan
         p5 = _build_principle(
             5,
-            "分红是否被自由现金流覆盖？",
+            "checklist.p5.title",
             "insufficient_data",
             "N/A",
-            "FCF 派发率 ≤ 100%",
-            "审计期间未进行现金分红或回购，无法评估分红可持续性。",
+            Translatable("checklist.p5.benchmark"),
+            Translatable("checklist.p5.desc.insufficient"),
         )
     elif total_fcf <= 0:
         fcf_payout_ratio = np.nan
         p5 = _build_principle(
             5,
-            "分红是否被自由现金流覆盖？",
+            "checklist.p5.title",
             "fail",
-            "N/A（FCF 为负）",
-            "FCF 派发率 ≤ 100%",
-            f"累计自由现金流为负，公司在举债分红或回购，不可持续。",
+            Translatable("checklist.p5.value.neg_fcf"),
+            Translatable("checklist.p5.benchmark"),
+            Translatable("checklist.p5.desc.neg_fcf"),
         )
     else:
         fcf_payout_ratio = total_payout / total_fcf
         if fcf_payout_ratio <= 1.0:
             status = "pass"
-            desc = (
-                f"FCF 派发率 {fcf_payout_ratio:.1%}，"
-                f"分红与回购完全被自由现金流覆盖，可持续。"
-            )
+            desc = Translatable("checklist.p5.desc.pass", ratio=fcf_payout_ratio)
         elif fcf_payout_ratio <= 1.25:
             status = "warning"
-            desc = (
-                f"FCF 派发率 {fcf_payout_ratio:.1%}，"
-                f"分红略超自由现金流，长期可能需举债维持，需关注。"
-            )
+            desc = Translatable("checklist.p5.desc.warning", ratio=fcf_payout_ratio)
         else:
             status = "fail"
-            desc = (
-                f"FCF 派发率 {fcf_payout_ratio:.1%}，"
-                f"分红大幅超出自由现金流，不可持续，存在毁灭价值风险。"
-            )
+            desc = Translatable("checklist.p5.desc.fail", ratio=fcf_payout_ratio)
         p5 = _build_principle(
             5,
-            "分红是否被自由现金流覆盖？",
+            "checklist.p5.title",
             status,
             f"{fcf_payout_ratio:.1%}",
-            "≤ 100%",
+            "\u2264 100%",
             desc,
         )
 
@@ -335,90 +288,70 @@ def generate_checklist(
         if pd.isna(first_roic) or pd.isna(last_roic):
             p6 = _build_principle(
                 6,
-                "资本效率趋势是否改善？",
+                "checklist.p6.title",
                 "insufficient_data",
                 "N/A",
-                "ROIC 趋势",
-                "ROIC 数据不足，无法判断趋势方向。",
+                Translatable("checklist.p6.benchmark.trend"),
+                Translatable("checklist.p6.desc.insufficient"),
             )
         elif np.isinf(first_roic) and np.isinf(last_roic):
             status = "pass"
-            desc = (
-                f"公司近 {len(recent_roic)} 年起始与期末的存量 ROIC 均视为无限大（持续处于负投入资本运转的“印钞机”状态），"
-                f"经营壁垒和资信占资优势极其稳固，资本效率卓越且稳定。"
-            )
             p6 = _build_principle(
                 6,
-                "资本效率趋势是否改善？",
+                "checklist.p6.title",
                 status,
-                "持续极高 (Negative IC)",
-                "持续优秀",
-                desc,
+                Translatable("checklist.p6.value.sustained_inf"),
+                Translatable("checklist.p6.benchmark.excellent"),
+                Translatable("checklist.p6.desc.sustained_inf", n_years=len(recent_roic)),
             )
         elif np.isinf(last_roic):
             status = "pass"
-            desc = (
-                f"公司近 {len(recent_roic)} 年 ROIC 从起始年份的 {first_roic:.1%} 跨越式跃升至期末年份的无限大（成功转型为零/负投入资本运转的印钞机状态），"
-                f"商业模式和资信壁垒呈现爆发式改善。"
-            )
             p6 = _build_principle(
                 6,
-                "资本效率趋势是否改善？",
+                "checklist.p6.title",
                 status,
-                f"{first_roic:.1%} → 极高",
-                "持续改善",
-                desc,
+                Translatable("checklist.p6.value.leap", first_roic=first_roic),
+                Translatable("checklist.p6.benchmark.improving"),
+                Translatable("checklist.p6.desc.leap", n_years=len(recent_roic), first_roic=first_roic),
             )
         elif np.isinf(first_roic):
             status = "fail"
-            desc = (
-                f"公司近 {len(recent_roic)} 年 ROIC 从起始年份的无限大（负投入资本印钞机状态）跌落至期末年份的 {last_roic:.1%}，"
-                f"说明公司的负投入资本红利有所收窄，或商业渠道优势发生松动，护城河出现侵蚀迹象。"
-            )
             p6 = _build_principle(
                 6,
-                "资本效率趋势是否改善？",
+                "checklist.p6.title",
                 status,
-                f"极高 → {last_roic:.1%}",
-                "保持优势",
-                desc,
+                Translatable("checklist.p6.value.slip", last_roic=last_roic),
+                Translatable("checklist.p6.benchmark.advantage"),
+                Translatable("checklist.p6.desc.slip", n_years=len(recent_roic), last_roic=last_roic),
             )
         else:
             trend = last_roic - first_roic
+            n_years = len(recent_roic)
             if trend > 0.01:
                 status = "pass"
-                desc = (
-                    f"近 {len(recent_roic)} 年 ROIC 从 {first_roic:.1%} "
-                    f"提升至 {last_roic:.1%}（+{trend:.1%}），护城河持续加固。"
-                )
+                desc = Translatable("checklist.p6.desc.improve", n_years=n_years, first_roic=first_roic, last_roic=last_roic, trend=trend)
             elif trend >= -0.05:
                 status = "warning"
-                desc = (
-                    f"近 {len(recent_roic)} 年 ROIC 从 {first_roic:.1%} "
-                    f"变动至 {last_roic:.1%}（{trend:+.1%}），基本稳定但需关注。"
-                )
+                desc = Translatable("checklist.p6.desc.stable", n_years=n_years, first_roic=first_roic, last_roic=last_roic, trend=trend)
             else:
                 status = "fail"
-                desc = (
-                    f"近 {len(recent_roic)} 年 ROIC 从 {first_roic:.1%} "
-                    f"下滑至 {last_roic:.1%}（{trend:.1%}），护城河明显侵蚀。"
-                )
+                desc = Translatable("checklist.p6.desc.decline", n_years=n_years, first_roic=first_roic, last_roic=last_roic, trend=trend)
             p6 = _build_principle(
                 6,
-                "资本效率趋势是否改善？",
+                "checklist.p6.title",
                 status,
-                f"{first_roic:.1%} → {last_roic:.1%}",
-                f"趋势 {trend:+.1%}",
+                f"{first_roic:.1%} \u2192 {last_roic:.1%}",
+                Translatable("checklist.p6.benchmark.trend_val", trend=trend),
                 desc,
             )
     else:
         p6 = _build_principle(
             6,
-            "资本效率趋势是否改善？",
+            "checklist.p6.title",
             "insufficient_data",
             "N/A",
-            "ROIC 趋势",
-            "ROIC 数据点不足（需至少 2 年），无法判断趋势。",
+            Translatable("checklist.p6.benchmark.trend"),
+            Translatable("checklist.p6.desc.insufficient_points"),
         )
 
     principles.append(p6)
@@ -442,63 +375,55 @@ def generate_checklist(
         latest_gw_growth = np.nan
 
     if not has_ma or pd.isna(latest_acquisition_roiic):
-        benchmark_str = f"ROIC 极高 / WACC {wacc:.1%}" if np.isinf(avg_roic) else (f"ROIC {avg_roic:.1%} / WACC {wacc:.1%}" if not pd.isna(avg_roic) else "N/A")
+        if np.isinf(avg_roic):
+            benchmark_str: Any = Translatable("checklist.p7.benchmark.inf_roic", wacc=wacc)
+        elif not pd.isna(avg_roic):
+            benchmark_str = f"ROIC {avg_roic:.1%} / WACC {wacc:.1%}"
+        else:
+            benchmark_str = "N/A"
         p7 = _build_principle(
             7,
-            "并购是否创造高于资本成本的价值？",
+            "checklist.p7.title",
             "insufficient_data",
             "N/A",
             benchmark_str,
-            "审计期间无显著并购支出，或 Acquisition ROIIC 数据不足，无法评估并购资本效率。",
+            Translatable("checklist.p7.desc.insufficient"),
         )
     else:
-        # Determine benchmark string
-        benchmark_str = f"WACC {wacc:.1%}" if np.isinf(avg_roic) else f"ROIC {avg_roic:.1%} / WACC {wacc:.1%}"
+        benchmark_str = (
+            f"WACC {wacc:.1%}"
+            if np.isinf(avg_roic)
+            else f"ROIC {avg_roic:.1%} / WACC {wacc:.1%}"
+        )
 
         if np.isinf(latest_acquisition_roiic):
             status = "pass"
-            val_str = "极高"
-            desc = f"Acquisition ROIIC 极为卓越（无限大），并购支出高效地创造了无需本金投入的额外税后经营利润！"
+            val_str: Any = Translatable("checklist.p7.value.excellent")
+            desc = Translatable("checklist.p7.desc.excellent")
         elif np.isinf(avg_roic):
-            # If base ROIC is infinite, as long as latest_acquisition_roiic >= wacc, it is a pass
             if latest_acquisition_roiic >= wacc:
                 status = "pass"
                 val_str = f"{latest_acquisition_roiic:.1%}"
-                desc = (
-                    f"虽然因存量投入资本为负使得存量 ROIC 视为无限大，但公司并购增量回报率 (Acquisition ROIIC) "
-                    f"达到 {latest_acquisition_roiic:.1%}，高于 WACC {wacc:.1%}，管理层的外延并购资金配置极其成功。"
-                )
+                desc = Translatable("checklist.p7.desc.inf_roic_pass", roiic=latest_acquisition_roiic, wacc=wacc)
             else:
                 status = "fail"
                 val_str = f"{latest_acquisition_roiic:.1%}"
-                desc = (
-                    f"虽然存量 ROIC 视为无限大，但公司并购增量回报率 (Acquisition ROIIC) 仅为 {latest_acquisition_roiic:.1%}，"
-                    f"低于 WACC {wacc:.1%}，表明外延并购在低效消耗资金，未能跑赢基本资金成本。"
-                )
+                desc = Translatable("checklist.p7.desc.inf_roic_fail", roiic=latest_acquisition_roiic, wacc=wacc)
         elif latest_acquisition_roiic >= avg_roic:
             status = "pass"
             val_str = f"{latest_acquisition_roiic:.1%}"
-            desc = (
-                f"Acquisition ROIIC {latest_acquisition_roiic:.1%} ≥ ROIC {avg_roic:.1%}，"
-                f"并购支出带来的增量回报不低于存量资本，管理层在为股东创造价值。"
-            )
+            desc = Translatable("checklist.p7.desc.ge_avg", roiic=latest_acquisition_roiic, roic=avg_roic)
         elif latest_acquisition_roiic >= wacc:
             status = "warning"
             val_str = f"{latest_acquisition_roiic:.1%}"
-            desc = (
-                f"Acquisition ROIIC {latest_acquisition_roiic:.1%} < ROIC {avg_roic:.1%}，"
-                f"并购回报边际递减但仍高于 WACC {wacc:.1%}，并购尚在创造价值但溢价纪律需警惕。"
-            )
+            desc = Translatable("checklist.p7.desc.ge_wacc", roiic=latest_acquisition_roiic, roic=avg_roic, wacc=wacc)
         else:
             status = "fail"
             val_str = f"{latest_acquisition_roiic:.1%}"
-            desc = (
-                f"Acquisition ROIIC {latest_acquisition_roiic:.1%} < WACC {wacc:.1%}，"
-                f"并购支出回报低于资本成本，管理层疑似正在毁灭股东价值。"
-            )
+            desc = Translatable("checklist.p7.desc.lt_wacc", roiic=latest_acquisition_roiic, wacc=wacc)
         p7 = _build_principle(
             7,
-            "并购是否创造高于资本成本的价值？",
+            "checklist.p7.title",
             status,
             val_str,
             benchmark_str,
@@ -523,41 +448,33 @@ def generate_checklist(
         avg_fcf_to_ni = np.nan
         p8 = _build_principle(
             8,
-            "盈利质量是否健康（现金转化）？",
+            "checklist.p8.title",
             "insufficient_data",
             "N/A",
-            "FCF / 净利润 ≥ 80%",
-            "审计期间无正净利润年度，无法评估盈利的现金支撑度。",
+            Translatable("checklist.p8.benchmark"),
+            Translatable("checklist.p8.desc.insufficient"),
         )
     else:
         fcf_aligned = ocf_aligned.loc[positive_np.index] - capex_aligned.loc[positive_np.index]
         ratios = fcf_aligned / positive_np
         avg_fcf_to_ni = float(ratios.mean())
 
+        n_years = len(ratios)
         if avg_fcf_to_ni >= 0.8:
             status = "pass"
-            desc = (
-                f"近 {len(ratios)} 年平均 FCF/净利润 {avg_fcf_to_ni:.1%}，"
-                f"盈利高度由自由现金流支撑，会计利润含金量充足。"
-            )
+            desc = Translatable("checklist.p8.desc.pass", n_years=n_years, ratio=avg_fcf_to_ni)
         elif avg_fcf_to_ni >= 0.5:
             status = "warning"
-            desc = (
-                f"近 {len(ratios)} 年平均 FCF/净利润 {avg_fcf_to_ni:.1%}，"
-                f"现金转化偏低，应计项偏重，盈利质量需结合应收与存货进一步核查。"
-            )
+            desc = Translatable("checklist.p8.desc.warning", n_years=n_years, ratio=avg_fcf_to_ni)
         else:
             status = "fail"
-            desc = (
-                f"近 {len(ratios)} 年平均 FCF/净利润 {avg_fcf_to_ni:.1%}，"
-                f"自由现金流远低于会计利润，盈利高度依赖应计项，质量存疑。"
-            )
+            desc = Translatable("checklist.p8.desc.fail", n_years=n_years, ratio=avg_fcf_to_ni)
         p8 = _build_principle(
             8,
-            "盈利质量是否健康（现金转化）？",
+            "checklist.p8.title",
             status,
             f"{avg_fcf_to_ni:.1%}",
-            "≥ 80%",
+            "\u2265 80%",
             desc,
         )
 
@@ -569,13 +486,14 @@ def generate_checklist(
     fail_count = sum(1 for p in principles if p["status"] == "fail")
     insufficient_count = sum(1 for p in principles if p["status"] == "insufficient_data")
 
-    summary = f"{pass_count}/{len(principles)} 原则通过"
-    if warning_count > 0:
-        summary += f"，{warning_count} 条警告"
-    if fail_count > 0:
-        summary += f"，{fail_count} 条未通过"
-    if insufficient_count > 0:
-        summary += f"，{insufficient_count} 条数据不足"
+    summary = Translatable(
+        "checklist.summary",
+        pass_count=pass_count,
+        total=len(principles),
+        warning_count=warning_count,
+        fail_count=fail_count,
+        insufficient_count=insufficient_count,
+    )
 
     return {
         "principles": principles,

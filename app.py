@@ -1,5 +1,6 @@
 import streamlit as st
 
+from i18n import t
 from services.audit_pipeline import run_audit
 from ui.sections import render_navigation, render_selected_section, render_summary
 from ui.sidebar import render_sidebar
@@ -7,7 +8,7 @@ from ui.sidebar import render_sidebar
 
 def configure_page() -> None:
     st.set_page_config(
-        page_title="资本配置审计系统",
+        page_title=t("app.title"),
         layout="wide",
         initial_sidebar_state="expanded",
         page_icon=None,
@@ -188,7 +189,7 @@ def main() -> None:
     try:
         result = run_audit(data, params)
     except Exception as exc:
-        st.error(f"❌ 审计模型运行失败：{exc}")
+        st.error(t("app.error.audit_failed", exc=exc))
         st.stop()
 
     col_nav, col_spacer = st.columns([1, 2])

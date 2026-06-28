@@ -1,6 +1,7 @@
 import json
 from typing import Tuple
 import streamlit as st
+from i18n import t, get_lang, set_lang, LANGUAGES, LANGUAGE_LABELS
 from models.input_schema import CompanyAuditInput
 from services.audit_pipeline import AuditParams
 from data.manager import DataManager
@@ -8,7 +9,7 @@ from data.manager import DataManager
 def get_empty_template() -> str:
     template = {
         "ticker": "XXXX.HK",
-        "company_name": "示例港股公司",
+        "company_name": t("sidebar.template.company_name"),
         "currency": "HKD",
         "amount_unit": "absolute",
         "market_currency": "HKD",
@@ -42,9 +43,9 @@ def get_empty_template() -> str:
 
 def _render_toolbox() -> None:
     st.sidebar.markdown("---")
-    st.sidebar.subheader("工具箱")
+    st.sidebar.subheader(t("sidebar.toolbox"))
     st.sidebar.download_button(
-        label="下载 JSON 财报输入模板",
+        label=t("sidebar.download_template"),
         data=get_empty_template(),
         file_name="capital_allocation_template.json",
         mime="application/json",
@@ -52,56 +53,56 @@ def _render_toolbox() -> None:
 
 def _render_params(data: CompanyAuditInput) -> AuditParams:
     st.sidebar.markdown("---")
-    st.sidebar.header("审计与估值模型参数")
+    st.sidebar.header(t("sidebar.params_header"))
 
-    st.sidebar.subheader("1. 维持性资本支出")
+    st.sidebar.subheader(t("sidebar.params.section1"))
     maintenance_capex_ratio = st.sidebar.slider(
-        "维持性 CapEx 占总资本开支比例",
+        t("sidebar.params.maintenance_capex_ratio"),
         min_value=0.10,
         max_value=1.00,
         value=0.50,
         step=0.05,
-        help="巴菲特定义“所有者盈余”时需扣除维持目前业务所需资本开支 (Maintenance CapEx)。财报中一般未披露，50% 为保守默认估算值。",
+        help=t("sidebar.params.maintenance_capex_help"),
     )
 
-    st.sidebar.subheader("2. ROIIC 滚动窗口与滞后参数")
+    st.sidebar.subheader(t("sidebar.params.section2"))
     num_years = len(data.years)
     max_roiic_window = max(1, num_years - 1)
     roiic_window_1 = int(
         st.sidebar.number_input(
-            "ROIIC 短窗口年数",
+            t("sidebar.params.roiic_window_1"),
             min_value=1,
             max_value=max_roiic_window,
             value=min(3, max_roiic_window),
             step=1,
-            help="用于生成第一个 ROIIC / ROIIC Retained 滚动窗口，默认 3 年。",
+            help=t("sidebar.params.roiic_window_1_help"),
         )
     )
     roiic_window_2 = int(
         st.sidebar.number_input(
-            "ROIIC 长窗口年数",
+            t("sidebar.params.roiic_window_2"),
             min_value=1,
             max_value=max_roiic_window,
             value=min(5, max_roiic_window),
             step=1,
-            help="用于生成第二个 ROIIC / ROIIC Retained 滚动窗口，默认 5 年。",
+            help=t("sidebar.params.roiic_window_2_help"),
         )
     )
     max_roiic_retained_lag = max(0, num_years - max(roiic_window_1, roiic_window_2))
     roiic_retained_lag = int(
         st.sidebar.number_input(
-            "ROIIC Retained 留存收益滞后年数",
+            t("sidebar.params.roiic_retained_lag"),
             min_value=0,
             max_value=max_roiic_retained_lag,
             value=min(1, max_roiic_retained_lag),
             step=1,
-            help="lag=1 时，计算 T+3 的 3 年 ROIIC Retained 会使用 T、T+1、T+2 的累计留存收益。",
+            help=t("sidebar.params.roiic_retained_lag_help"),
         )
     )
 
-    st.sidebar.subheader("3. 两阶段 DCF 估值模型参数")
+    st.sidebar.subheader(t("sidebar.params.section3"))
     wacc = st.sidebar.slider(
-        "折现率 (WACC / 机会成本)",
+        t("sidebar.params.wacc"),
         min_value=0.05,
         max_value=0.50,
         value=0.08,
@@ -109,7 +110,7 @@ def _render_params(data: CompanyAuditInput) -> AuditParams:
         format="%.3f",
     )
     growth_stage_1 = st.sidebar.slider(
-        "第一阶段增长率（前 5 年）",
+        t("sidebar.params.growth_stage_1"),
         min_value=-0.10,
         max_value=0.30,
         value=0.08,
@@ -117,7 +118,7 @@ def _render_params(data: CompanyAuditInput) -> AuditParams:
         format="%.2f",
     )
     growth_stage_2 = st.sidebar.slider(
-        "第二阶段增长率（后 5 年）",
+        t("sidebar.params.growth_stage_2"),
         min_value=-0.10,
         max_value=0.20,
         value=0.04,
@@ -125,7 +126,7 @@ def _render_params(data: CompanyAuditInput) -> AuditParams:
         format="%.2f",
     )
     terminal_growth = st.sidebar.slider(
-        "永续增长率 (Terminal Growth)",
+        t("sidebar.params.terminal_growth"),
         min_value=-0.05,
         max_value=0.05,
         value=0.02,
@@ -134,7 +135,7 @@ def _render_params(data: CompanyAuditInput) -> AuditParams:
     )
 
     if wacc <= terminal_growth:
-        st.sidebar.error("折现率 WACC 必须大于永续增长率。")
+        st.sidebar.error(t("sidebar.error.wacc_le_terminal"))
         st.stop()
 
     return AuditParams(
@@ -148,70 +149,76 @@ def _render_params(data: CompanyAuditInput) -> AuditParams:
         terminal_growth=terminal_growth,
     )
 
+DATA_SOURCE_OPTIONS = {
+    "futu": "sidebar.data_source.futu",
+    "yahoo": "sidebar.data_source.yahoo",
+    "upload": "sidebar.data_source.upload",
+}
+
 def render_sidebar() -> Tuple[CompanyAuditInput, AuditParams]:
-    st.sidebar.header("数据源选择与载入")
+    lang = st.sidebar.selectbox(
+        t("sidebar.language"),
+        LANGUAGES,
+        format_func=lambda l: LANGUAGE_LABELS[l],
+        index=LANGUAGES.index(get_lang()),
+    )
+    if lang != get_lang():
+        set_lang(lang)
+
+    st.sidebar.header(t("sidebar.data_source_header"))
     data_source_opt = st.sidebar.selectbox(
-        "选择审计标的",
-        [
-            "从 Futu OpenD 实时拉取",
-            # "从 雅虎财经 (Yahoo Finance) 实时拉取",
-            "上传自定义 JSON 数据文件"
-        ],
+        t("sidebar.data_source.label"),
+        ["futu", "upload"],
+        format_func=lambda k: t(DATA_SOURCE_OPTIONS[k]),
     )
 
-    # Initialize variables
     data_obj = None
 
-    # Handle source selection
-    if data_source_opt == "上传自定义 JSON 数据文件":
-        uploaded_file = st.sidebar.file_uploader("上传结构化 JSON 财报文件", type=["json"])
+    if data_source_opt == "upload":
+        uploaded_file = st.sidebar.file_uploader(t("sidebar.upload.label"), type=["json"])
         if uploaded_file is not None:
             try:
                 raw_data = json.load(uploaded_file)
                 data_obj = CompanyAuditInput(**raw_data)
-                st.sidebar.success("上传成功")
+                st.sidebar.success(t("sidebar.upload.success"))
             except Exception as exc:
-                st.sidebar.error(f"解析/校验 JSON 失败: {exc}")
+                st.sidebar.error(t("sidebar.upload.parse_error", exc=exc))
                 st.stop()
         else:
-            st.info("请在侧边栏上传 JSON 财报文件启动审计系统。")
+            st.info(t("sidebar.upload.prompt"))
             st.stop()
 
     else:
-        # Live APIs (Yahoo or Futu)
-        is_yahoo = "Yahoo" in data_source_opt
+        is_yahoo = data_source_opt == "yahoo"
         provider_name = "yahoo" if is_yahoo else "futu"
         default_ticker = "0388.HK" if is_yahoo else "HK.00388"
 
         with st.sidebar.form("api_fetch_form"):
-            ticker_input = st.text_input("输入港股代码", value=default_ticker, help="例如: 0388.HK, 9988.HK 或 HK.00388").strip()
-            
-            # Years Slider selection
+            ticker_input = st.text_input(t("sidebar.futu.ticker_input"), value=default_ticker, help=t("sidebar.futu.ticker_help")).strip()
+
             years_range = st.slider(
-                "选择财报审计年份区间",
+                t("sidebar.futu.year_range"),
                 min_value=2010,
                 max_value=2025,
                 value=(2016, 2025),
                 step=1
             )
             years_list = list(range(years_range[0], years_range[1] + 1))
-            
-            force_refresh = st.checkbox("强制刷新本地数据库缓存", value=False)
-            fetch_btn = st.form_submit_button("开始拉取并审计")
+
+            force_refresh = st.checkbox(t("sidebar.futu.force_refresh"), value=False)
+            fetch_btn = st.form_submit_button(t("sidebar.futu.fetch_btn"))
 
         source_key = f"{ticker_input}_{provider_name}_{years_range[0]}_{years_range[1]}"
 
-        # 1. Memory/Session Cache check (must not bypass cache unless force_refresh is requested via fetch_btn)
         bypass_cache = force_refresh and fetch_btn
 
         if not bypass_cache and "cached_input_data" in st.session_state and st.session_state.get("cached_source_key") == source_key:
             data_obj = st.session_state["cached_input_data"]
         else:
-            # 2. Disk or API load (only triggered if the fetch button is clicked or cache is available)
             manager = DataManager()
             if fetch_btn:
                 try:
-                    with st.spinner("正在加载财报数据..."):
+                    with st.spinner(t("sidebar.futu.loading")):
                         data_obj = manager.get_audit_input(
                             ticker=ticker_input,
                             provider_name=provider_name,
@@ -220,16 +227,15 @@ def render_sidebar() -> Tuple[CompanyAuditInput, AuditParams]:
                         )
                     st.session_state["cached_input_data"] = data_obj
                     st.session_state["cached_source_key"] = source_key
-                    st.sidebar.success(f"成功加载 {ticker_input} ({years_range[0]}-{years_range[1]})")
+                    st.sidebar.success(t("sidebar.futu.load_success", ticker=ticker_input, year_start=years_range[0], year_end=years_range[1]))
                 except Exception as exc:
-                    st.sidebar.error(f"数据加载失败：{exc}")
+                    st.sidebar.error(t("sidebar.futu.load_error", exc=exc))
                     st.stop()
             else:
-                # If button was not clicked, but we have cached dict on disk, try to restore from it silently to avoid cold-start blocking
                 cached_dict = None
                 if not bypass_cache:
                     cached_dict = manager.cache.get_audit_input(ticker_input, provider_name)
-                
+
                 if cached_dict and set(years_list).issubset(set(cached_dict.get("years", []))):
                     try:
                         sliced_dict = manager._slice_cached_dict(cached_dict, years_list)
@@ -238,9 +244,9 @@ def render_sidebar() -> Tuple[CompanyAuditInput, AuditParams]:
                         st.session_state["cached_source_key"] = source_key
                     except Exception:
                         pass
-                
+
                 if data_obj is None:
-                    st.info("请在侧边栏调整参数，并点击【开始拉取并审计】按钮开始。")
+                    st.info(t("sidebar.futu.start_prompt"))
                     st.stop()
 
     _render_toolbox()
