@@ -3,7 +3,7 @@ from typing import Tuple
 import streamlit as st
 from i18n import t, get_lang, set_lang, LANGUAGES, LANGUAGE_LABELS
 from models.input_schema import CompanyAuditInput
-from services.audit_pipeline import AuditParams
+from services.audit_pipeline import AuditParams, AuditResult
 from data.manager import DataManager
 
 def get_empty_template() -> str:
@@ -50,6 +50,44 @@ def _render_toolbox() -> None:
         file_name="capital_allocation_template.json",
         mime="application/json",
     )
+
+def render_pdf_export_button(
+    data: CompanyAuditInput, params: AuditParams, result: AuditResult
+) -> None:
+    """
+    Render a sidebar button that exports the full audit as a PDF report.
+
+    Should be called after :func:`render_sidebar` and after ``run_audit`` has
+    produced ``result``. The report is built on-demand when the user clicks;
+    Streamlit re-runs the script on click, so we gate the heavy build behind
+    a session-state flag to avoid rebuilding on every interaction.
+    """
+    st.sidebar.markdown("---")
+    st.sidebar.subheader(t("sidebar.pdf_export_header"))
+
+    button_key = "build_pdf_report_btn"
+    if st.sidebar.button(t("sidebar.pdf_export_button"), key=button_key):
+        try:
+            with st.spinner(t("sidebar.pdf_export_building")):
+                from report import build_report
+
+                pdf_bytes = build_report(data, params, result)
+            st.session_state["pdf_report_bytes"] = pdf_bytes
+            st.session_state["pdf_report_ticker"] = data.ticker
+        except ImportError as exc:
+            st.sidebar.error(t("sidebar.pdf_export_dep_error", exc=exc))
+        except Exception as exc:
+            st.sidebar.error(t("sidebar.pdf_export_error", exc=exc))
+
+    pdf_bytes = st.session_state.get("pdf_report_bytes")
+    cached_ticker = st.session_state.get("pdf_report_ticker")
+    if pdf_bytes and cached_ticker == data.ticker:
+        st.sidebar.download_button(
+            label=t("sidebar.pdf_download"),
+            data=pdf_bytes,
+            file_name=f"capital_allocation_audit_{data.ticker}.pdf",
+            mime="application/pdf",
+        )
 
 def _render_params(data: CompanyAuditInput) -> AuditParams:
     st.sidebar.markdown("---")

@@ -13,6 +13,7 @@
 - 盈利质量审计：对比净利润、所有者盈余与自由现金流，追踪应计项比率与每股所有者盈余 (OEPS)，识破会计利润粉饰。
 - 巴菲特原则清单：基于 8 条客观原则（ROIC vs WACC、ROIIC vs ROIC、一美元原则、回购纪律、FCF 覆盖、趋势检查、并购资本效率、盈利质量）自动生成事实判定，辅助价值投资研究。
 - 标准化底表导出：展示并导出模型计算后的审计底表，便于复核和二次分析。
+- PDF 报告导出：一键生成包含全部审计维度、图表、原则清单与参数附录的 PDF 报告，便于存档与分享。
 - 自定义参数：支持调整维持性资本支出比例、WACC、阶段增长率和永续增长率。
 
 ## 技术栈
@@ -23,6 +24,8 @@
 - NumPy
 - Plotly
 - Pydantic
+- WeasyPrint（PDF 报告生成）
+- Kaleido（Plotly 图表静态化）
 
 ## 项目结构
 
@@ -40,6 +43,11 @@
 │   └── input_schema.py     # 输入数据结构与校验规则
 ├── services/
 │   └── audit_pipeline.py   # 自动化审计流水线
+├── report/                 # PDF 报告生成模块
+│   ├── builder.py          # 报告编排器（组装数据 → HTML → PDF）
+│   ├── renderer.py         # Plotly 图表 → PNG 静态化
+│   ├── sections.py         # 七大审计板块 HTML 片段构建
+│   └── template.py         # Jinja2 HTML 模板与 CSS 样式
 ├── tests/                  # 核心量化逻辑单元测试
 ├── ui/                     # Streamlit 页面、侧边栏和图表模块
 ├── requirements.txt        # Python 依赖
@@ -61,6 +69,12 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+> **PDF 报告功能额外系统依赖**：WeasyPrint 需要 cairo/pango/gdk-pixbuf 系统库。
+>
+> - macOS：`brew install cairo pango gdk-pixbuf libffi`
+> - Ubuntu/Debian：`sudo apt install libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf2.0-0 libffi-dev`
+> - 仅使用 PDF 导出功能时需要；Streamlit 仪表盘本身无需这些系统库。
+
 3. 启动应用：
 
 ```bash
@@ -72,6 +86,18 @@ streamlit run app.py
 ```text
 http://localhost:8501
 ```
+
+## PDF 报告导出
+
+在侧边栏「PDF 报告导出」分区点击「生成 PDF 审计报告」按钮，系统会基于当前载入的财务数据和参数生成一份完整的 PDF 审计报告，包含：
+
+- **封面**：公司元信息、统计年限、币种、生成时间。
+- **执行摘要**：8 条巴菲特原则的通过/警告/未通过/数据不足计数汇总。
+- **七大审计板块**：累计资本流向、ROIC & ROIIC、股份回购、并购与商誉、盈利质量、原则清单、审计底表，与 Streamlit 仪表盘各维度一一对应，并嵌入 Plotly 图表的静态高清版本。
+- **参数附录**：记录生成报告时的全部 AuditParams（WACC、增长率、维持性资本支出比例、ROIIC 窗口与滞后年数等），便于复核。
+- **免责声明**：复用仪表盘的免责声明。
+
+报告使用与仪表盘一致的 Courier Prime "old-money" 排版风格，中英双语自动随当前界面语言切换。生成过程首次约 30 秒（含 Chromium 图表渲染）；点击生成后会出现「下载 PDF 报告」按钮用于下载。
 
 ## 数据输入
 

@@ -26,6 +26,30 @@ TRANSLATIONS = {
         "zh": "下载 JSON 财报输入模板",
         "en": "Download JSON Financial Input Template",
     },
+    "sidebar.pdf_export_header": {
+        "zh": "PDF 报告导出",
+        "en": "Export PDF Report",
+    },
+    "sidebar.pdf_export_button": {
+        "zh": "生成 PDF 审计报告",
+        "en": "Generate PDF Audit Report",
+    },
+    "sidebar.pdf_export_building": {
+        "zh": "正在生成 PDF 报告，含图表渲染，请稍候...",
+        "en": "Building PDF report with charts, please wait...",
+    },
+    "sidebar.pdf_download": {
+        "zh": "下载 PDF 报告",
+        "en": "Download PDF Report",
+    },
+    "sidebar.pdf_export_dep_error": {
+        "zh": "缺少 PDF 生成依赖：{exc}。请运行 `pip install weasyprint kaleido` 并安装系统库（macOS: `brew install cairo pango gdk-pixbuf libffi`）。",
+        "en": "Missing PDF generation dependency: {exc}. Run `pip install weasyprint kaleido` and install system libs (macOS: `brew install cairo pango gdk-pixbuf libffi`).",
+    },
+    "sidebar.pdf_export_error": {
+        "zh": "PDF 生成失败：{exc}",
+        "en": "PDF generation failed: {exc}",
+    },
     "sidebar.template.company_name": {
         "zh": "示例港股公司",
         "en": "Sample HK Listed Company",
