@@ -25,6 +25,7 @@ import pandas as pd
 from i18n import resolve, t
 from models.input_schema import CompanyAuditInput
 from services.audit_pipeline import AuditParams, AuditResult
+from core.formatting import format_ledger_cell as _format_ledger_cell
 from ui.charts import (
     create_allocation_pie_chart,
     create_buyback_chart,
@@ -42,7 +43,12 @@ from ui.charts import (
 def _scale_absolute_to_million(result: AuditResult) -> AuditResult:
     """When amount_unit is 'absolute', divide monetary fields by 1e6 for display.
 
-    Mirrors :func:`ui.sections.render_selected_section` scaling.
+    Mirrors :func:`ui.sections.render_selected_section` scaling, but note the
+    ledger section is intentionally excluded from this scaling by the caller
+    (:func:`report.builder._build_sections` passes the unscaled result to
+    :func:`build_ledger_section`), matching the dashboard's
+    ``section != SECTION_LEDGER`` guard. The raw audit table therefore keeps
+    original absolute values regardless of amount_unit.
     """
     fields_to_scale = [
         "net_profit", "ebit", "interest_expense", "total_equity",
@@ -411,26 +417,11 @@ _LEDGER_CHUNKS = [
 ]
 
 _LEDGER_CHUNK_LABELS = {
-    # "inputs": "Inputs",
+    "inputs": "Inputs",
     "core": "Core Metrics",
     "ratios": "Ratios",
     "valuation": "Valuation & Buyback",
 }
-
-
-def _format_ledger_cell(value: Any, col: str) -> str:
-    if isinstance(value, str):
-        return value
-    if pd.isna(value):
-        return "—"
-    if np.isinf(value):
-        return "∞"
-    low = col.lower()
-    if any(x in low for x in ["rate", "ratio", "roic", "roiic", "rule", "value", "percent", "price"]):
-        if "shares_outstanding" in col or "buybacks_shares" in col:
-            return f"{value:,.0f}"
-        return f"{value:,.2f}"
-    return f"{value:,.0f}"
 
 
 def build_ledger_section(data: CompanyAuditInput, result: AuditResult) -> Dict[str, Any]:
@@ -438,8 +429,21 @@ def build_ledger_section(data: CompanyAuditInput, result: AuditResult) -> Dict[s
     years = list(df.index)
     tables: List[Dict[str, Any]] = []
 
+    # Get all numeric columns as UI does
+    ui_numeric_cols = list(df.select_dtypes(include="number").columns)
+    
+    # Collect columns already claimed by other chunks
+    claimed_by_others = set()
     for chunk_key, cols in _LEDGER_CHUNKS:
-        present = [c for c in cols if c in df.columns]
+        if chunk_key != "inputs":
+            claimed_by_others.update(cols)
+            
+    # Redefine inputs chunk to be everything in UI not in other chunks
+    dynamic_inputs = [c for c in ui_numeric_cols if c not in claimed_by_others]
+
+    for chunk_key, cols in _LEDGER_CHUNKS:
+        target_cols = dynamic_inputs if chunk_key == "inputs" else cols
+        present = [c for c in target_cols if c in df.columns]
         if not present:
             continue
         headers = ["Year"] + present

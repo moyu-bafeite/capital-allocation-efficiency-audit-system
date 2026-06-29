@@ -2,6 +2,7 @@ import streamlit as st
 import numpy as np
 import pandas as pd
 
+from core.formatting import is_ratio_or_price_column
 from i18n import t, resolve
 from models.input_schema import CompanyAuditInput
 from services.audit_pipeline import AuditParams, AuditResult
@@ -393,11 +394,7 @@ def render_ledger_section(data: CompanyAuditInput, result: AuditResult) -> None:
 
     formatters = {}
     for column in numeric_columns:
-        is_ratio_or_price = any(
-            x in column.lower()
-            for x in ["rate", "ratio", "price", "roic", "roiic", "rule", "value", "percent"]
-        )
-        if is_ratio_or_price:
+        if is_ratio_or_price_column(column):
             formatters[column] = "{:,.2f}"
         else:
             formatters[column] = "{:,.0f}"

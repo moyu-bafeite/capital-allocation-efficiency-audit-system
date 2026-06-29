@@ -53,13 +53,24 @@ def _build_sections(
     data: CompanyAuditInput,
     params: AuditParams,
     effective_result: AuditResult,
+    ledger_result: AuditResult = None,
 ) -> List[Dict[str, Any]]:
     """Build the seven body sections with format-agnostic chart figs.
 
     Sections emit ``{"fig": go.Figure, "height": int, ...}`` dicts; the
     format-specific rendering (PNG vs interactive div) happens later in
     :func:`_render_charts_for_pdf` / :func:`_render_charts_for_html`.
+
+    ``ledger_result`` defaults to ``effective_result`` when omitted. When
+    ``amount_unit == "absolute"``, the caller passes the *unscaled* result
+    here so the ledger section mirrors the dashboard's
+    ``section != SECTION_LEDGER`` exclusion (see
+    :func:`ui.sections.render_selected_section`): the raw audit table keeps
+    original absolute values while the other six sections render in
+    million-scaled form.
     """
+    if ledger_result is None:
+        ledger_result = effective_result
     return [
         build_capital_allocation_section(data, effective_result),
         build_roic_roiic_section(params, effective_result),
@@ -67,7 +78,7 @@ def _build_sections(
         build_ma_goodwill_section(data, params, effective_result),
         build_earnings_quality_section(data, effective_result),
         build_checklist_section(effective_result),
-        build_ledger_section(data, effective_result),
+        build_ledger_section(data, ledger_result),
     ]
 
 
@@ -208,7 +219,7 @@ def build_report(
         if data.amount_unit == "absolute"
         else result
     )
-    sections = _build_sections(data, params, effective_result)
+    sections = _build_sections(data, params, effective_result, ledger_result=result)
     _render_charts_for_pdf(sections)
 
     context = _build_context(data, params, result, sections)
@@ -233,7 +244,7 @@ def build_report_html(
         if data.amount_unit == "absolute"
         else result
     )
-    sections = _build_sections(data, params, effective_result)
+    sections = _build_sections(data, params, effective_result, ledger_result=result)
     _render_charts_for_html(sections)
 
     context = _build_context(data, params, result, sections)

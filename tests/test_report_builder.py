@@ -171,6 +171,121 @@ class SectionsTest(unittest.TestCase):
             result.audited_df["net_profit"].iloc[0] / 1e6,
         )
 
+    def test_ledger_section_not_scaled_when_absolute(self):
+        """Regression: when amount_unit=='absolute', the ledger Inputs table
+        must show original absolute values (no /1e6 scaling), matching the
+        dashboard's ``section != SECTION_LEDGER`` exclusion in
+        :func:`ui.sections.render_selected_section`. Other sections must
+        still receive million-scaled data.
+        """
+        from core.formatting import format_ledger_cell
+        from report.builder import _build_sections
+        from report.sections import (
+            _scale_absolute_to_million,
+            build_ma_goodwill_section,
+        )
+
+        abs_input = _make_absolute_input()
+        result = run_audit(abs_input, _make_params())
+        scaled = _scale_absolute_to_million(result)
+
+        sections = _build_sections(
+            abs_input, _make_params(), scaled, ledger_result=result
+        )
+
+        # _build_sections order: [capital, roic, buyback, ma, eq, checklist, ledger]
+        ledger_section = sections[6]
+        ma_section = sections[3]
+
+        # 1) Ledger Inputs cells must equal formatting of the RAW (unscaled) result
+        inputs_tbl = next(
+            tbl for tbl in ledger_section["tables"] if tbl["caption"] == "Inputs"
+        )
+        np_idx = inputs_tbl["headers"].index("net_profit")
+        ebit_idx = inputs_tbl["headers"].index("ebit")
+        eq_idx = inputs_tbl["headers"].index("total_equity")
+        for row_i, year in enumerate(result.audited_df.index):
+            self.assertEqual(
+                inputs_tbl["rows"][row_i][np_idx],
+                format_ledger_cell(
+                    result.audited_df.at[year, "net_profit"], "net_profit"
+                ),
+            )
+            self.assertEqual(
+                inputs_tbl["rows"][row_i][ebit_idx],
+                format_ledger_cell(result.audited_df.at[year, "ebit"], "ebit"),
+            )
+            self.assertEqual(
+                inputs_tbl["rows"][row_i][eq_idx],
+                format_ledger_cell(
+                    result.audited_df.at[year, "total_equity"], "total_equity"
+                ),
+            )
+
+        # 2) Non-ledger section (M&A) must still use the SCALED result, not raw
+        expected_scaled_ma = build_ma_goodwill_section(abs_input, _make_params(), scaled)
+        expected_raw_ma = build_ma_goodwill_section(abs_input, _make_params(), result)
+        self.assertEqual(ma_section["metrics"], expected_scaled_ma["metrics"])
+        self.assertNotEqual(ma_section["metrics"], expected_raw_ma["metrics"])
+
+    def test_format_ledger_cell_aligns_with_ui_rules(self):
+        import numpy as np
+        from core.formatting import format_ledger_cell
+
+        # Ratio / price columns → 2 decimals
+        self.assertEqual(format_ledger_cell(0.1234, "ROIC"), "0.12")
+        self.assertEqual(format_ledger_cell(0.1234, "tax_rate"), "0.12")
+        self.assertEqual(format_ledger_cell(9.876, "avg_stock_price"), "9.88")
+        self.assertEqual(format_ledger_cell(1.234, "Intrinsic_Value_Share"), "1.23")
+        # Quirk columns (no ratio/price keyword in name) → 2 decimals
+        self.assertEqual(format_ledger_cell(0.1543, "Goodwill_to_Equity"), "0.15")
+        self.assertEqual(format_ledger_cell(0.2345, "Goodwill_to_IC"), "0.23")
+        self.assertEqual(format_ledger_cell(0.5678, "MA_to_OCF"), "0.57")
+        self.assertEqual(format_ledger_cell(0.9, "OE_to_NetProfit"), "0.90")
+        self.assertEqual(format_ledger_cell(0.8765, "FCF_to_NetIncome"), "0.88")
+        self.assertEqual(format_ledger_cell(1.234, "OEPS"), "1.23")
+        self.assertEqual(format_ledger_cell(0.0567, "Goodwill_vs_NOPAT_Growth_5Y"), "0.06")
+        # Amount / share-count columns → 0 decimals with thousands sep
+        self.assertEqual(format_ledger_cell(1234.6, "NOPAT"), "1,235")
+        self.assertEqual(format_ledger_cell(1000.0, "Invested_Capital"), "1,000")
+        self.assertEqual(format_ledger_cell(88.6, "shares_outstanding"), "89")
+        # Short-circuits
+        self.assertEqual(format_ledger_cell(np.nan, "ROIC"), "—")
+        self.assertEqual(format_ledger_cell(np.inf, "ROIC"), "∞")
+        self.assertEqual(format_ledger_cell("pass", "Buyback_Audit_Rating"), "pass")
+
+    def test_ui_and_report_share_core_formatting(self):
+        """Guard against drift: both layers must use core.formatting's helpers."""
+        import core.formatting as fmt
+        import ui.sections as ui_s
+        import report.sections as rpt_s
+
+        self.assertIs(ui_s.is_ratio_or_price_column, fmt.is_ratio_or_price_column)
+        self.assertIs(rpt_s._format_ledger_cell, fmt.format_ledger_cell)
+
+    def test_ledger_section_renders_quirk_columns_with_two_decimals(self):
+        """End-to-end: the report ledger tables must format quirk ratio
+        columns with 2 decimals (not the pre-fix 0-decimal `{:,.0f}`)."""
+        import pandas as pd
+        from report.sections import build_ledger_section
+
+        section = build_ledger_section(self.data, self.result)
+        df = self.result.audited_df
+        # Find the ratios chunk and locate Goodwill_to_Equity column
+        ratios_tbl = next(
+            tbl for tbl in section["tables"] if tbl["caption"] == "Ratios"
+        )
+        col_idx = ratios_tbl["headers"].index("Goodwill_to_Equity")
+        for row_idx, year in enumerate(df.index):
+            raw = df.at[year, "Goodwill_to_Equity"]
+            cell = ratios_tbl["rows"][row_idx][col_idx]
+            if pd.notna(raw):
+                # Two decimals implies the formatted string either has a
+                # decimal point with two digits after it, or is "—"/"∞".
+                self.assertIn(".", cell)
+                self.assertEqual(len(cell.split(".")[-1]), 2)
+
+
 
 class BuilderTest(unittest.TestCase):
     @classmethod

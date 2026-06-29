@@ -349,7 +349,6 @@ html, body {
 /* Section breaks: visual separation instead of page breaks on screen */
 .section-break { break-before: auto; margin-top: 1.2cm; }
 .section {
-    border-top: 1px solid rgba(128, 128, 128, 0.15);
     padding-top: 0.4cm;
 }
 .section:first-of-type { border-top: none; padding-top: 0; }
