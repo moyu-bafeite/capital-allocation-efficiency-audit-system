@@ -26,7 +26,7 @@ from i18n import resolve, t
 from models.input_schema import CompanyAuditInput
 from services.audit_pipeline import AuditParams, AuditResult
 from core.formatting import format_ledger_cell as _format_ledger_cell
-from ui.charts import (
+from services.charts import (
     create_allocation_pie_chart,
     create_buyback_chart,
     create_earnings_quality_chart,

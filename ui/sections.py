@@ -6,7 +6,7 @@ from core.formatting import is_ratio_or_price_column
 from i18n import t, resolve
 from models.input_schema import CompanyAuditInput
 from services.audit_pipeline import AuditParams, AuditResult
-from ui.charts import (
+from services.charts import (
     create_allocation_pie_chart,
     create_buyback_chart,
     create_earnings_quality_chart,

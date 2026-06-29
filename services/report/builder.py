@@ -22,13 +22,13 @@ from i18n import LANGUAGE_LABELS, get_lang, resolve, t
 from models.input_schema import CompanyAuditInput
 from services.audit_pipeline import AuditParams, AuditResult
 
-from report.renderer import (
+from services.report.renderer import (
     get_plotlyjs_inline,
     kaleido_server,
     safe_fig_to_base64_png,
     safe_fig_to_plotly_div,
 )
-from report.sections import (
+from services.report.sections import (
     build_buyback_section,
     build_capital_allocation_section,
     build_checklist_section,
@@ -39,7 +39,7 @@ from report.sections import (
     build_roic_roiic_section,
     _scale_absolute_to_million,
 )
-from report.template import render_html
+from services.report.template import render_html
 
 logger = logging.getLogger(__name__)
 

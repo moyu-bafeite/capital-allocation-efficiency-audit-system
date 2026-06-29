@@ -46,9 +46,15 @@ The project supports real-time fetching of Hong Kong stock historical financial 
 ├── models/
 │   └── input_schema.py     # Input data structure & validation rules
 ├── services/
-│   └── audit_pipeline.py   # Automated audit pipeline
+│   ├── audit_pipeline.py   # Automated audit pipeline
+│   ├── charts.py           # Plotly chart builders (shared by UI and reports)
+│   └── report/             # PDF/HTML report generator
+│       ├── builder.py      # Report orchestrator (data → HTML → PDF)
+│       ├── renderer.py     # Plotly charts → static PNG
+│       ├── sections.py     # Seven audit section HTML fragment builders
+│       └── template.py     # Jinja2 HTML template & CSS styles
 ├── tests/                  # Core quantitative logic unit tests
-├── ui/                     # Streamlit pages, sidebar, and chart modules
+├── ui/                     # Streamlit pages & sidebar modules
 ├── requirements.txt        # Python dependencies
 └── README.md
 ```

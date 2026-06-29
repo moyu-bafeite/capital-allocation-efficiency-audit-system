@@ -46,14 +46,15 @@
 ├── models/
 │   └── input_schema.py     # 输入数据结构与校验规则
 ├── services/
-│   └── audit_pipeline.py   # 自动化审计流水线
-├── report/                 # PDF 报告生成模块
-│   ├── builder.py          # 报告编排器（组装数据 → HTML → PDF）
-│   ├── renderer.py         # Plotly 图表 → PNG 静态化
-│   ├── sections.py         # 七大审计板块 HTML 片段构建
-│   └── template.py         # Jinja2 HTML 模板与 CSS 样式
+│   ├── audit_pipeline.py   # 自动化审计流水线
+│   ├── charts.py           # Plotly 图表构造工具（供 UI 与报告共享）
+│   └── report/             # PDF/HTML 报告生成模块
+│       ├── builder.py      # 报告编排器（组装数据 → HTML → PDF）
+│       ├── renderer.py     # Plotly 图表 → PNG 静态化
+│       ├── sections.py     # 七大审计板块 HTML 片段构建
+│       └── template.py     # Jinja2 HTML 模板与 CSS 样式
 ├── tests/                  # 核心量化逻辑单元测试
-├── ui/                     # Streamlit 页面、侧边栏和图表模块
+├── ui/                     # Streamlit 页面与侧边栏模块
 ├── requirements.txt        # Python 依赖
 └── README.md
 ```

@@ -39,7 +39,7 @@ def _make_absolute_input():
 
 class RendererTest(unittest.TestCase):
     def test_fig_to_base64_png_returns_data_uri(self):
-        from report.renderer import fig_to_base64_png
+        from services.report.renderer import fig_to_base64_png
 
         fig = go.Figure(go.Scatter(x=[1, 2, 3], y=[4, 5, 6]))
         uri = fig_to_base64_png(fig, scale=1, height=200)
@@ -50,7 +50,7 @@ class RendererTest(unittest.TestCase):
         self.assertGreater(len(payload), 100)
 
     def test_safe_fig_to_base64_png_returns_none_on_failure(self):
-        from report.renderer import safe_fig_to_base64_png
+        from services.report.renderer import safe_fig_to_base64_png
 
         class BrokenFig:
             def to_image(self, **kwargs):
@@ -62,7 +62,7 @@ class RendererTest(unittest.TestCase):
         self.assertIsNone(safe_fig_to_base64_png(BrokenFig()))
 
     def test_fig_to_plotly_div_returns_interactive_html(self):
-        from report.renderer import fig_to_plotly_div
+        from services.report.renderer import fig_to_plotly_div
 
         fig = go.Figure(go.Scatter(x=[1, 2, 3], y=[4, 5, 6]))
         div = fig_to_plotly_div(fig, height=240)
@@ -74,7 +74,7 @@ class RendererTest(unittest.TestCase):
         self.assertNotIn("function plotly", div.lower())
 
     def test_safe_fig_to_plotly_div_returns_none_on_failure(self):
-        from report.renderer import safe_fig_to_plotly_div
+        from services.report.renderer import safe_fig_to_plotly_div
 
         class BrokenFig:
             def to_html(self, **kwargs):
@@ -86,7 +86,7 @@ class RendererTest(unittest.TestCase):
         self.assertIsNone(safe_fig_to_plotly_div(BrokenFig()))
 
     def test_get_plotlyjs_inline_is_substantial(self):
-        from report.renderer import get_plotlyjs_inline
+        from services.report.renderer import get_plotlyjs_inline
 
         js = get_plotlyjs_inline()
         self.assertIsInstance(js, str)
@@ -101,7 +101,7 @@ class SectionsTest(unittest.TestCase):
         self.result = run_audit(self.data, self.params)
 
     def test_capital_allocation_section_has_fig_charts(self):
-        from report.sections import build_capital_allocation_section
+        from services.report.sections import build_capital_allocation_section
 
         section = build_capital_allocation_section(self.data, self.result)
         self.assertIn("title", section)
@@ -115,7 +115,7 @@ class SectionsTest(unittest.TestCase):
             self.assertNotIn("src", chart)
 
     def test_all_sections_emit_fig_not_src(self):
-        from report.sections import (
+        from services.report.sections import (
             build_buyback_section,
             build_earnings_quality_section,
             build_ma_goodwill_section,
@@ -134,7 +134,7 @@ class SectionsTest(unittest.TestCase):
                 self.assertNotIn("src", chart)
 
     def test_buyback_section_table_has_year_column(self):
-        from report.sections import build_buyback_section
+        from services.report.sections import build_buyback_section
 
         section = build_buyback_section(self.data, self.result)
         self.assertTrue(section["tables"])
@@ -144,7 +144,7 @@ class SectionsTest(unittest.TestCase):
             self.assertTrue(row[0].isdigit())
 
     def test_checklist_section_has_eight_principles(self):
-        from report.sections import build_checklist_section
+        from services.report.sections import build_checklist_section
 
         section = build_checklist_section(self.result)
         self.assertEqual(len(section["principles"]), 8)
@@ -153,7 +153,7 @@ class SectionsTest(unittest.TestCase):
             self.assertIn("badge", p)
 
     def test_ledger_section_chunks_present(self):
-        from report.sections import build_ledger_section
+        from services.report.sections import build_ledger_section
 
         section = build_ledger_section(self.data, self.result)
         self.assertTrue(section["tables"])
@@ -161,7 +161,7 @@ class SectionsTest(unittest.TestCase):
             self.assertEqual(len(tbl["headers"]), len(tbl["rows"][0]))
 
     def test_absolute_amount_unit_scaling(self):
-        from report.sections import _scale_absolute_to_million
+        from services.report.sections import _scale_absolute_to_million
 
         abs_input = _make_absolute_input()
         result = run_audit(abs_input, _make_params())
@@ -179,8 +179,8 @@ class SectionsTest(unittest.TestCase):
         still receive million-scaled data.
         """
         from core.formatting import format_ledger_cell
-        from report.builder import _build_sections
-        from report.sections import (
+        from services.report.builder import _build_sections
+        from services.report.sections import (
             _scale_absolute_to_million,
             build_ma_goodwill_section,
         )
@@ -258,7 +258,7 @@ class SectionsTest(unittest.TestCase):
         """Guard against drift: both layers must use core.formatting's helpers."""
         import core.formatting as fmt
         import ui.sections as ui_s
-        import report.sections as rpt_s
+        import services.report.sections as rpt_s
 
         self.assertIs(ui_s.is_ratio_or_price_column, fmt.is_ratio_or_price_column)
         self.assertIs(rpt_s._format_ledger_cell, fmt.format_ledger_cell)
@@ -267,7 +267,7 @@ class SectionsTest(unittest.TestCase):
         """End-to-end: the report ledger tables must format quirk ratio
         columns with 2 decimals (not the pre-fix 0-decimal `{:,.0f}`)."""
         import pandas as pd
-        from report.sections import build_ledger_section
+        from services.report.sections import build_ledger_section
 
         section = build_ledger_section(self.data, self.result)
         df = self.result.audited_df
@@ -295,7 +295,7 @@ class BuilderTest(unittest.TestCase):
         cls.result = run_audit(cls.data, cls.params)
 
     def test_build_report_html_returns_bytes_with_plotly(self):
-        from report import build_report_html
+        from services.report import build_report_html
 
         payload = build_report_html(self.data, self.params, self.result)
         self.assertIsInstance(payload, bytes)
@@ -311,7 +311,7 @@ class BuilderTest(unittest.TestCase):
             self.assertIn(f"Principle {i}".encode(), payload)
 
     def test_build_report_html_has_seven_body_sections(self):
-        from report.builder import _build_sections, _build_context
+        from services.report.builder import _build_sections, _build_context
 
         sections = _build_sections(self.data, self.params, self.result)
         ctx = _build_context(self.data, self.params, self.result, sections)
@@ -320,7 +320,7 @@ class BuilderTest(unittest.TestCase):
             self.assertTrue(s.get("title"))
 
     def test_build_report_html_absolute_unit(self):
-        from report import build_report_html
+        from services.report import build_report_html
 
         abs_input = _make_absolute_input()
         result = run_audit(abs_input, self.params)
@@ -329,7 +329,7 @@ class BuilderTest(unittest.TestCase):
         self.assertIn(b"Plotly.newPlot", payload)
 
     def test_render_charts_for_pdf_replaces_fig_with_src(self):
-        from report.builder import _build_sections, _render_charts_for_pdf
+        from services.report.builder import _build_sections, _render_charts_for_pdf
 
         sections = _build_sections(self.data, self.params, self.result)
         _render_charts_for_pdf(sections)
@@ -340,7 +340,7 @@ class BuilderTest(unittest.TestCase):
                 self.assertIn("src", chart)
 
     def test_render_charts_for_html_replaces_fig_with_html_div(self):
-        from report.builder import _build_sections, _render_charts_for_html
+        from services.report.builder import _build_sections, _render_charts_for_html
 
         sections = _build_sections(self.data, self.params, self.result)
         _render_charts_for_html(sections)
@@ -356,7 +356,7 @@ class BuilderTest(unittest.TestCase):
         "weasyprint not installed; skipping PDF rendering test",
     )
     def test_build_report_returns_valid_pdf_bytes(self):
-        from report import build_report
+        from services.report import build_report
 
         pdf = build_report(self.data, self.params, self.result)
         self.assertIsInstance(pdf, bytes)
