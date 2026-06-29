@@ -8,3 +8,6 @@ duckdb>=0.10.0
 futu-api>=10.7
 weasyprint>=60.0
 kaleido>=0.2.1
+pypdf>=4.0.0
+requests>=2.30.0
+beautifulsoup4>=4.12.0

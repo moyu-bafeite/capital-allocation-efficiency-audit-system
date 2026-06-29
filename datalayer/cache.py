@@ -1,8 +1,8 @@
 import os
 import json
 import duckdb
-from datetime import datetime
-from typing import Dict, List, Any, Optional
+from datetime import datetime, date
+from typing import Dict, List, Any, Optional, Set, Union
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _DEFAULT_DB_PATH = os.path.join(_PROJECT_ROOT, ".cache", "audit.db")
@@ -73,6 +73,24 @@ class DatabaseCache:
                     data_json VARCHAR,
                     fetched_at TIMESTAMP,
                     PRIMARY KEY (ticker, provider)
+                )
+            """)
+
+            # Table 5: HKEX Monthly Return share capital movements
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS hkex_share_capital (
+                    stock_code VARCHAR,
+                    company_name VARCHAR,
+                    report_period_date DATE,
+                    report_year INTEGER,
+                    report_month INTEGER,
+                    pub_date DATE,
+                    shares_issued_excl_treasury BIGINT,
+                    shares_treasury BIGINT,
+                    shares_total_issued BIGINT,
+                    source_pdf_url VARCHAR,
+                    fetched_at TIMESTAMP,
+                    PRIMARY KEY (stock_code, report_period_date)
                 )
             """)
 
@@ -176,6 +194,90 @@ class DatabaseCache:
             """, (ticker, provider)).fetchone()
             return json.loads(res[0]) if res else None
 
+    def save_hkex_share_capital(self, record: Dict[str, Any]):
+        """Upserts a single HKEX monthly return record into hkex_share_capital.
+
+        Expected record keys: stock_code, company_name, report_period_date (date/dict/str),
+        report_year, report_month, pub_date (date/dict/str/None),
+        shares_issued_excl_treasury, shares_treasury, shares_total_issued, source_pdf_url.
+        """
+        now = datetime.now()
+        with duckdb.connect(self.db_path) as conn:
+            conn.execute("""
+                INSERT OR REPLACE INTO hkex_share_capital
+                    (stock_code, company_name, report_period_date, report_year, report_month,
+                     pub_date, shares_issued_excl_treasury, shares_treasury, shares_total_issued,
+                     source_pdf_url, fetched_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                record["stock_code"],
+                record.get("company_name"),
+                _to_duck_date(record.get("report_period_date")),
+                int(record["report_year"]),
+                int(record["report_month"]),
+                _to_duck_date(record.get("pub_date")),
+                int(record["shares_issued_excl_treasury"]),
+                int(record.get("shares_treasury", 0)),
+                int(record.get("shares_total_issued", 0)),
+                record.get("source_pdf_url"),
+                now,
+            ))
+
+    def get_hkex_share_capital(self, stock_code: str, year: int) -> List[Dict[str, Any]]:
+        """Retrieves all monthly return records for a stock in a given year, ordered by report_period_date."""
+        with duckdb.connect(self.db_path) as conn:
+            res = conn.execute("""
+                SELECT stock_code, company_name, report_period_date, report_year, report_month,
+                       pub_date, shares_issued_excl_treasury, shares_treasury, shares_total_issued,
+                       source_pdf_url, fetched_at
+                FROM hkex_share_capital
+                WHERE stock_code = ? AND report_year = ?
+                ORDER BY report_month
+            """, (stock_code, int(year))).fetchall()
+        return [
+            {
+                "stock_code": r[0], "company_name": r[1],
+                "report_period_date": r[2], "report_year": r[3], "report_month": r[4],
+                "pub_date": r[5], "shares_issued_excl_treasury": r[6],
+                "shares_treasury": r[7], "shares_total_issued": r[8],
+                "source_pdf_url": r[9], "fetched_at": r[10],
+            }
+            for r in res
+        ]
+
+    def get_latest_hkex_pub_date(self, stock_code: str) -> Optional[date]:
+        """Returns the latest pub_date (as datetime.date) for a stock, or None if no records exist."""
+        with duckdb.connect(self.db_path) as conn:
+            res = conn.execute("""
+                SELECT MAX(pub_date) FROM hkex_share_capital WHERE stock_code = ?
+            """, (stock_code,)).fetchone()
+        return res[0] if res and res[0] is not None else None
+
+    def get_hkex_year_end_shares(self, stock_code: str, year: int) -> Optional[Dict[str, Any]]:
+        """Returns the year-end share capital record (report_month=12 preferred, else 11), or None."""
+        records = self.get_hkex_share_capital(stock_code, year)
+        if not records:
+            return None
+        for r in records:
+            if r["report_month"] == 12:
+                return r
+        for r in records:
+            if r["report_month"] == 11:
+                return r
+        return None
+
+    def get_existing_hkex_periods(self, stock_code: str) -> Set[date]:
+        """Returns the set of all report_period_date values stored for a stock.
+
+        Used by the sync script to skip re-downloading PDFs for report periods
+        already present in the DB (deduplication by primary key).
+        """
+        with duckdb.connect(self.db_path) as conn:
+            res = conn.execute("""
+                SELECT report_period_date FROM hkex_share_capital WHERE stock_code = ?
+            """, (stock_code,)).fetchall()
+        return {r[0] for r in res if r[0] is not None}
+
     def clear_cache(self):
         """Truncates all tables in the database."""
         with duckdb.connect(self.db_path) as conn:
@@ -184,6 +286,26 @@ class DatabaseCache:
             conn.execute("DELETE FROM closing_exchange_rates")
             conn.execute("DELETE FROM stock_prices")
             conn.execute("DELETE FROM audit_inputs")
+            conn.execute("DELETE FROM hkex_share_capital")
+
+def _to_duck_date(val) -> Optional[Union[date, str]]:
+    """Normalizes a date-ish value to something DuckDB accepts for a DATE column.
+
+    Accepts datetime.date, datetime.datetime, dict with 'year'/'month'/'day',
+    or a string 'YYYY-MM-DD'. Returns None for None.
+    """
+    if val is None:
+        return None
+    if isinstance(val, (date, datetime)):
+        return val if isinstance(val, date) else val.date()
+    if isinstance(val, dict):
+        try:
+            return date(int(val["year"]), int(val["month"]), int(val["day"]))
+        except (KeyError, ValueError):
+            return None
+    if isinstance(val, str):
+        return val.strip() or None
+    return val
 
 def pd_isna(val) -> bool:
     try:
