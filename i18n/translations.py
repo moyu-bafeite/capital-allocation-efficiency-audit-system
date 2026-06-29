@@ -721,8 +721,8 @@ TRANSLATIONS = {
         "en": "SQL Execution Failed: {exc}",
     },
     "section.ledger.sql.no_cache": {
-        "zh": "缓存数据库 `audit_cache.db` 尚未建立。请从左侧通过 Yahoo 或 Futu 接口拉取并分析任意港股实时数据以进行初始化。",
-        "en": "The cache database `audit_cache.db` has not been created yet. Please fetch and analyze any HK stock data via the Yahoo or Futu interface from the sidebar to initialize.",
+        "zh": "缓存数据库 `audit.db` 尚未建立。请从左侧通过 Futu 接口拉取并分析任意港股实时数据以进行初始化。",
+        "en": "The cache database `audit.db` has not been created yet. Please fetch and analyze any HK stock data via the Futu interface from the sidebar to initialize.",
     },
     "section.ledger.sql.init_error": {
         "zh": "无法初始化 DuckDB 诊断工具: {exc}",

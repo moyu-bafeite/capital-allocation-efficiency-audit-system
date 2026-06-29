@@ -63,4 +63,4 @@ outputs/
 Thumbs.db
 
 # Cache
-*.db
+.cache/

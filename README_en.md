@@ -35,7 +35,11 @@ The project supports real-time fetching of Hong Kong stock historical financial 
 │   ├── calculator.py       # Financial metric calculation & data processing
 │   ├── checklist.py        # Buffett capital allocation principles checklist
 │   └── valuation.py        # Two-stage DCF intrinsic value estimation
-├── data/                   # Local cache & data storage directory
+├── datalayer/              # Data access layer (market API adapters / cache / normalization)
+│   ├── cache.py            # DuckDB local cache read/write
+│   ├── manager.py          # Data manager (cache hit → API fetch → persist)
+│   ├── normalizer.py       # Financial data cleaning & normalization
+│   └── providers/          # Market API adapters (Futu, etc.)
 ├── i18n/                   # Internationalization module
 │   ├── i18n.py             # Translation engine (t() function, Translatable)
 │   └── translations.py     # Translation catalog (zh + en)
@@ -85,7 +89,6 @@ The UI supports both Chinese (default) and English. Use the language selector at
 The system supports three data sources:
 
 - Real-time fetching of HK stock historical financial data via Futu OpenD (default, recommended).
-- Real-time fetching of HK stock historical financial data via Yahoo Finance.
 - Uploading a structured JSON financial data file.
 
 The app sidebar provides a JSON input template download feature — download the template directly and fill in the company's financial data.

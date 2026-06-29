@@ -413,7 +413,7 @@ def render_ledger_section(data: CompanyAuditInput, result: AuditResult) -> None:
 
     try:
         import duckdb
-        from data.cache import DB_PATH
+        from datalayer.cache import DATABASE_URL
         import os
 
         SQL_TEMPLATES = {
@@ -424,7 +424,7 @@ def render_ledger_section(data: CompanyAuditInput, result: AuditResult) -> None:
             "custom": "",
         }
 
-        if os.path.exists(DB_PATH):
+        if os.path.exists(DATABASE_URL):
             col_sql1, col_sql2 = st.columns([1, 3])
             with col_sql1:
                 sql_key = st.selectbox(
@@ -444,7 +444,7 @@ def render_ledger_section(data: CompanyAuditInput, result: AuditResult) -> None:
 
             if custom_sql.strip():
                 try:
-                    with duckdb.connect(DB_PATH, read_only=True) as conn:
+                    with duckdb.connect(DATABASE_URL, read_only=True) as conn:
                         df_res = conn.execute(custom_sql).df()
                     st.success(t("section.ledger.sql.success"))
                     st.dataframe(df_res, use_container_width=True)

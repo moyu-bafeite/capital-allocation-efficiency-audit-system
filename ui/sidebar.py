@@ -4,7 +4,7 @@ import streamlit as st
 from i18n import t, get_lang, set_lang, LANGUAGES, LANGUAGE_LABELS
 from models.input_schema import CompanyAuditInput
 from services.audit_pipeline import AuditParams, AuditResult
-from data.manager import DataManager
+from datalayer.manager import DataManager
 
 def get_empty_template() -> str:
     template = {

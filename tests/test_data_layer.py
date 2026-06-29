@@ -4,10 +4,10 @@ import unittest
 import tempfile
 from typing import Dict, Any, List
 
-from data.cache import DatabaseCache
-from data.normalizer import normalize_audit_data
-from data.manager import DataManager
-from data.providers.base import BaseProvider
+from datalayer.cache import DatabaseCache
+from datalayer.normalizer import normalize_audit_data
+from datalayer.manager import DataManager
+from datalayer.providers.base import BaseProvider
 
 class MockProvider(BaseProvider):
     def fetch_financial_data(self, ticker: str, years: List[int]) -> Dict[str, Any]:

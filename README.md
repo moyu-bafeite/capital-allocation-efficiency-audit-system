@@ -38,7 +38,11 @@
 │   ├── calculator.py       # 财务指标计算与数据加工
 │   ├── checklist.py        # 巴菲特资本配置原则清单
 │   └── valuation.py        # 两阶段 DCF 内在价值估算
-├── data/                   # 本地缓存与数据存储目录
+├── datalayer/              # 数据访问层（行情接口适配/缓存/归一化管理）
+│   ├── cache.py            # DuckDB 本地缓存读写
+│   ├── manager.py          # 数据管理器（缓存命中 → API 拉取 → 持久化）
+│   ├── normalizer.py       # 财务数据清洗与归一化
+│   └── providers/          # 行情 API 适配器（Futu 等）
 ├── models/
 │   └── input_schema.py     # 输入数据结构与校验规则
 ├── services/
@@ -115,7 +119,6 @@ http://localhost:8501
 系统支持三种数据来源：
 
 - 通过富途牛牛 (Futu OpenD) 实时拉取港股历史财务数据（默认推荐）。
-- 通过雅虎财经 (Yahoo Finance) 实时拉取港股历史财务数据。
 - 上传符合结构要求的 JSON 财报文件。
 
 应用侧边栏提供了 JSON 输入模板下载功能，可直接下载模板后填入公司财务数据。
