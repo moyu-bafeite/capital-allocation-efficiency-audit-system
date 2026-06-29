@@ -25,7 +25,7 @@ def configure_page() -> None:
             }
 
             /* Apply Courier Prime to standard text and UI widgets */
-            h1, h2, h3, h4, h5, h6, p, label, .stMetric, .stMarkdown, input, select, textarea {
+            h1, h2, h3, h4, h5, h6, p, label, li, .stMetric, .stMarkdown, input, select, textarea, div[role="listbox"], ul[role="listbox"], li[role="option"], div[data-baseweb="popover"], div[data-baseweb="select"], div[data-baseweb="select"] span {
                 font-family: 'Courier Prime', 'Noto Sans SC', monospace !important;
             }
 

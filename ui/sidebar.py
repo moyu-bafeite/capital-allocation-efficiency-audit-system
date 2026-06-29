@@ -111,9 +111,9 @@ def render_report_export_button(
 
 def _render_params(data: CompanyAuditInput) -> AuditParams:
     st.sidebar.markdown("---")
-    st.sidebar.header(t("sidebar.params_header"))
+    st.sidebar.subheader(t("sidebar.params_header"))
 
-    st.sidebar.subheader(t("sidebar.params.section1"))
+    st.sidebar.markdown(f"#### {t('sidebar.params.section1')}")
     maintenance_capex_ratio = st.sidebar.slider(
         t("sidebar.params.maintenance_capex_ratio"),
         min_value=0.10,
@@ -123,7 +123,7 @@ def _render_params(data: CompanyAuditInput) -> AuditParams:
         help=t("sidebar.params.maintenance_capex_help"),
     )
 
-    st.sidebar.subheader(t("sidebar.params.section2"))
+    st.sidebar.markdown(f"#### {t('sidebar.params.section2')}")
     num_years = len(data.years)
     max_roiic_window = max(1, num_years - 1)
     roiic_window_1 = int(
@@ -158,7 +158,7 @@ def _render_params(data: CompanyAuditInput) -> AuditParams:
         )
     )
 
-    st.sidebar.subheader(t("sidebar.params.section3"))
+    st.sidebar.markdown(f"#### {t('sidebar.params.section3')}")
     wacc = st.sidebar.slider(
         t("sidebar.params.wacc"),
         min_value=0.05,
@@ -218,12 +218,12 @@ def render_sidebar() -> Tuple[CompanyAuditInput, AuditParams]:
         t("sidebar.language"),
         LANGUAGES,
         format_func=lambda l: LANGUAGE_LABELS[l],
-        index=LANGUAGES.index(get_lang()),
+        index=LANGUAGES.index(get_lang())
     )
     if lang != get_lang():
         set_lang(lang)
 
-    st.sidebar.header(t("sidebar.data_source_header"))
+    st.sidebar.subheader(t("sidebar.data_source_header"))
     data_source_opt = st.sidebar.selectbox(
         t("sidebar.data_source.label"),
         ["futu", "upload"],
