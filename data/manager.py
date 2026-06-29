@@ -2,7 +2,6 @@ from typing import List, Dict, Any, Optional
 from models.input_schema import CompanyAuditInput
 from data.cache import DatabaseCache
 from data.normalizer import normalize_audit_data
-from data.providers.yahoo import YahooFinanceProvider
 from data.providers.futu import FutuOpenDProvider
 
 class DataManager:
@@ -39,7 +38,7 @@ class DataManager:
         Retrieves the CompanyAuditInput from the cache or pulls it from the specified provider API.
         
         :param ticker: Stock ticker/symbol (e.g. '0388.HK')
-        :param provider_name: Provider name ('yahoo' or 'futu')
+        :param provider_name: Provider name ('futu')
         :param years: List of integer fiscal years.
         :param refresh: If True, forces a fresh API call and updates the cache.
         :return: A validated CompanyAuditInput object.
@@ -58,12 +57,10 @@ class DataManager:
                     return CompanyAuditInput(**sliced_dict)
 
         # 2. Instantiate correct API provider
-        if provider_name == "yahoo":
-            provider = YahooFinanceProvider()
-        elif provider_name == "futu":
+        if provider_name == "futu":
             provider = FutuOpenDProvider()
         else:
-            raise ValueError(f"Unknown data provider: '{provider_name}'. Supported providers: 'yahoo', 'futu'")
+            raise ValueError(f"Unknown data provider: '{provider_name}'. Supported providers: 'futu'")
 
         # 3. Pull raw data from API
         raw_data = provider.fetch_financial_data(ticker, years)

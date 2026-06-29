@@ -174,10 +174,6 @@ TRANSLATIONS = {
         "zh": "从 Futu OpenD 实时拉取",
         "en": "Fetch Live from Futu OpenD",
     },
-    "sidebar.data_source.yahoo": {
-        "zh": "从 Yahoo Finance 实时拉取",
-        "en": "Fetch Live from Yahoo Finance",
-    },
     "sidebar.data_source.upload": {
         "zh": "上传自定义 JSON 数据文件",
         "en": "Upload Custom JSON Data File",

@@ -19,7 +19,7 @@ class FutuOpenDProvider(BaseProvider):
             raise ConnectionError(
                 f"Failed to connect to FutuOpenD at {self.host}:{self.port}. "
                 f"Error: {exc}. Please make sure FutuOpenD/Moomoo OpenD is running, "
-                f"or switch to Yahoo Finance in the sidebar."
+                f"or upload a custom JSON data file via the sidebar."
             )
 
         try:

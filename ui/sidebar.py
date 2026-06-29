@@ -209,7 +209,6 @@ def _render_params(data: CompanyAuditInput) -> AuditParams:
 
 DATA_SOURCE_OPTIONS = {
     "futu": "sidebar.data_source.futu",
-    "yahoo": "sidebar.data_source.yahoo",
     "upload": "sidebar.data_source.upload",
 }
 
@@ -247,9 +246,8 @@ def render_sidebar() -> Tuple[CompanyAuditInput, AuditParams]:
             st.stop()
 
     else:
-        is_yahoo = data_source_opt == "yahoo"
-        provider_name = "yahoo" if is_yahoo else "futu"
-        default_ticker = "0388.HK" if is_yahoo else "HK.00388"
+        provider_name = "futu"
+        default_ticker = "HK.00388"
 
         with st.sidebar.form("api_fetch_form"):
             ticker_input = st.text_input(t("sidebar.futu.ticker_input"), value=default_ticker, help=t("sidebar.futu.ticker_help")).strip()

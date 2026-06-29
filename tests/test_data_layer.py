@@ -155,10 +155,10 @@ class DataLayerTest(unittest.TestCase):
         # Prepopulate cache
         years = [2020, 2021]
         mock_input = MockProvider().fetch_financial_data("TEST", years)
-        manager.cache.save_audit_input("TEST", "yahoo", mock_input)
+        manager.cache.save_audit_input("TEST", "futu", mock_input)
 
         # Call get_audit_input with refresh = False
-        res = manager.get_audit_input("TEST", "yahoo", years, refresh=False)
+        res = manager.get_audit_input("TEST", "futu", years, refresh=False)
         self.assertEqual(res.ticker, "TEST")
         self.assertEqual(res.company_name, "Mock Inc")
 
