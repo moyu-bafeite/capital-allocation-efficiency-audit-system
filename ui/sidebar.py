@@ -37,6 +37,7 @@ def get_empty_template() -> str:
             "fair_value_changes": [0.0, 0.0, 0.0, 0.0, 0.0],
             "shares_outstanding": [100000000.0, 100000000.0, 98000000.0, 94500000.0, 88500000.0],
             "avg_stock_price": [10.0, 12.0, 9.0, 8.0, 11.0],
+            "closing_stock_price": [10.5, 11.0, 8.5, 9.0, 12.0],
         },
     }
     return json.dumps(template, indent=2, ensure_ascii=False)

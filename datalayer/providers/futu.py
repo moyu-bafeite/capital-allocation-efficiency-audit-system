@@ -55,6 +55,7 @@ class FutuOpenDProvider(BaseProvider):
 
             # 4. Fetch Stock Prices to calculate annual average (unadjusted, requested yearly)
             avg_prices = []
+            closing_prices = []
             for year in years:
                 ret, kline_df, page_req_key = quote_ctx.request_history_kline(
                     futu_symbol, 
@@ -75,8 +76,13 @@ class FutuOpenDProvider(BaseProvider):
                     )
                 
                 avg_prices.append(float(kline_df["close"].mean()))
-            
+                # Year-end closing price = the last trading day's close in the
+                # requested year (kline is sorted ascending by date). Used for
+                # period-end market cap alongside year-end shares.
+                closing_prices.append(float(kline_df.iloc[-1]["close"]))
+
             financials["avg_stock_price"] = avg_prices
+            financials["closing_stock_price"] = closing_prices
 
             # 5. Get Exchange Rates (average and closing)
             exchange_rates, closing_exchange_rates = self._fetch_exchange_rates(quote_ctx, "HKD", reporting_currency, years)
@@ -254,24 +260,20 @@ class FutuOpenDProvider(BaseProvider):
         
         mapped["tax_rate"] = tax_rates
 
-        # Post-process: Double Insurance calculation of shares_outstanding
+        # Fallback: estimate shares_outstanding from net_profit / EPS. This is a
+        # rough weighted-average estimate (EPS is itself rounded) and breaks for
+        # loss years (EPS=0). It is OVERRIDDEN by authoritative HKEX year-end
+        # share-capital data in DataManager._enrich_shares_from_hkex when the
+        # monthly-return data has been fetched into the DB. When HKEX data is
+        # absent, this fallback (or the normalizer's 100M default) is used.
         for idx, year in enumerate(years):
             np_val = mapped["net_profit"][idx]
             eps_val = mapped["eps"][idx]
-
-            # Insurance 1: Try to compute using Net Profit / EPS (highly precise average shares outstanding)
             if eps_val != 0:
                 mapped["shares_outstanding"][idx] = abs(int(round(np_val / eps_val)))
-
-        # Validation: Fail fast if shares_outstanding is missing or invalid
-        for idx, year in enumerate(years):
-            if mapped["shares_outstanding"][idx] <= 0:
-                raise ValueError(
-                    f"Failed to retrieve or calculate valid shares_outstanding in year {year}. "
-                    f"Please verify the financial reports."
-                )
-            # Ensure all are stored as integers
-            mapped["shares_outstanding"][idx] = int(round(mapped["shares_outstanding"][idx]))
+            # Leave 0.0 when EPS==0 (loss years); DataManager override or the
+            # schema's >0 validation handles the rest. Do NOT hard-crash here —
+            # that would abort the whole fetch on a single loss year.
 
         # Remove internal helper field 'eps'
         mapped.pop("eps", None)

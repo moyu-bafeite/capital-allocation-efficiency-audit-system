@@ -21,8 +21,9 @@ class FinancialsSchema(BaseModel):
     buybacks_shares: List[float] = Field(..., description="Absolute number of shares repurchased")
     ma_paid: List[float] = Field(..., description="Cash paid for acquisitions / M&A (non-negative, normalized from signed API values)")
     goodwill: List[float] = Field(..., description="Goodwill on balance sheet")
-    shares_outstanding: List[float] = Field(..., description="Absolute number of outstanding shares")
+    shares_outstanding: List[float] = Field(..., description="Absolute number of outstanding shares (year-end, excl. treasury)")
     avg_stock_price: List[float] = Field(..., description="Average annual stock price, in market_currency per share")
+    closing_stock_price: Optional[List[float]] = Field(default=None, description="Closing stock price at the year's last trading day, in market_currency per share. Used for period-end market cap. Falls back to avg_stock_price when absent (e.g. legacy cached data).")
     impairment_charges: Optional[List[float]] = Field(default=None, description="Goodwill or asset impairment charges (positive for loss)")
     fair_value_changes: Optional[List[float]] = Field(default=None, description="Fair value changes of investment properties or financial assets (positive for gains, negative for losses)")
     special_items_of_operating_profit: Optional[List[float]] = Field(default=None, description="Special items of operating profit / exceptional operating items")
@@ -74,6 +75,12 @@ class CompanyAuditInput(BaseModel):
             if getattr(self.financials, field_name) is None:
                 setattr(self.financials, field_name, [0.0] * num_years)
 
+        # closing_stock_price: fall back to avg_stock_price when absent (legacy
+        # cached data without the field). Normalizer also handles this, but the
+        # validator is the last line of defense before the data is used.
+        if getattr(self.financials, "closing_stock_price", None) is None:
+            setattr(self.financials, "closing_stock_price", list(self.financials.avg_stock_price))
+
         if num_years < 2:
             raise ValueError("At least two years of financial data are required")
         if any(year <= prev_year for prev_year, year in zip(self.years, self.years[1:])):
@@ -110,6 +117,8 @@ class CompanyAuditInput(BaseModel):
             raise ValueError("All shares_outstanding values must be greater than 0")
         if any(price <= 0 for price in self.financials.avg_stock_price):
             raise ValueError("All avg_stock_price values must be greater than 0")
+        if any(price <= 0 for price in self.financials.closing_stock_price):
+            raise ValueError("All closing_stock_price values must be greater than 0")
 
         non_negative_fields = [
             "interest_expense",

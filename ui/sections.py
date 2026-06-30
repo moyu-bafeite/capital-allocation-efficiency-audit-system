@@ -466,6 +466,7 @@ def render_selected_section(section: str, data: CompanyAuditInput, params: Audit
             "short_term_debt", "long_term_debt", "cash_and_equivalents",
             "operating_cash_flow", "capex", "da", "dividends_paid",
             "buybacks_paid", "ma_paid", "goodwill", "shares_outstanding",
+            "avg_stock_price", "closing_stock_price",
             "buybacks_shares", "Market_Cap", "Owner_Earnings",
             "maintenance_capex", "total_debt", "Invested_Capital",
             "Retained_Earnings_Annual", "FCF"

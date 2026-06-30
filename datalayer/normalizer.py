@@ -71,6 +71,18 @@ def normalize_audit_data(raw_data: Dict[str, Any]) -> Dict[str, Any]:
     else:
         financials["avg_stock_price"] = [10.0] * num_years
 
+    # closing_stock_price (period-end). Fall back to avg_stock_price when the
+    # field is missing (legacy cached data) or any value is non-positive, so
+    # period-end market cap degrades gracefully to the average basis.
+    avg_prices = financials["avg_stock_price"]
+    if "closing_stock_price" in financials and financials["closing_stock_price"] is not None:
+        financials["closing_stock_price"] = [
+            float(v) if (v is not None and v > 0) else avg_prices[i]
+            for i, v in enumerate(financials["closing_stock_price"])
+        ]
+    else:
+        financials["closing_stock_price"] = list(avg_prices)
+
     # 4. Fill key net_profit, ebit and optional non-cash adjustment lists
     optional_keys = [
         "impairment_charges",

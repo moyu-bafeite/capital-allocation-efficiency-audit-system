@@ -82,11 +82,20 @@ class FinancialCalculator:
             - maintenance_capex
         )
 
-        # 5. Market Capitalization, converted to the reporting currency and matched to amount_unit.
+        # 5. Market Capitalization (period-end basis).
+        # Period-end market cap = year-end shares × year-end closing price ×
+        # year-end closing FX rate. All three are point-in-time authoritative
+        # figures (shares from HKEX monthly return, price = last trading day
+        # close, FX = closing rate), consistent with the period-end intrinsic
+        # value per share. avg_stock_price_reporting_currency is retained below
+        # for the stock-price trend chart, but Market_Cap uses closing values.
         self.df["avg_stock_price_reporting_currency"] = (
             self.df["avg_stock_price"] * self.df["exchange_rate_to_reporting_currency"]
         )
-        raw_market_cap = self.df["shares_outstanding"] * self.df["avg_stock_price_reporting_currency"]
+        self.df["closing_stock_price_reporting_currency"] = (
+            self.df["closing_stock_price"] * self.df["closing_exchange_rate_to_reporting_currency"]
+        )
+        raw_market_cap = self.df["shares_outstanding"] * self.df["closing_stock_price_reporting_currency"]
         if self.data.amount_unit == "million":
             self.df["Market_Cap"] = raw_market_cap / 1e6
         else:

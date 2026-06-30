@@ -2,6 +2,7 @@ import os
 import shutil
 import unittest
 import tempfile
+from datetime import date
 from typing import Dict, Any, List
 
 from datalayer.cache import DatabaseCache
@@ -189,6 +190,138 @@ class DataLayerTest(unittest.TestCase):
         # Slice with invalid/non-existent year should return original dictionary
         sliced_invalid = manager._slice_cached_dict(cached_dict, [2018, 2022])
         self.assertEqual(sliced_invalid, cached_dict)
+
+
+class HkexSharesEnrichmentTest(unittest.TestCase):
+    """Tests for DataManager._enrich_shares_from_hkex — overriding the Futu
+    provider's net_profit/EPS shares estimate with authoritative HKEX year-end
+    share-capital data when it is present in the DB.
+    """
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+        self.db_path = os.path.join(self.test_dir, "test_cache.db")
+        self.cache = DatabaseCache(self.db_path)
+        self.manager = DataManager(self.cache)
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir)
+
+    def _seed_hkex_year_end(self, stock_code, year, total, excl_treasury=None):
+        """Insert a December monthly-return record so get_hkex_year_end_shares returns it."""
+        rec = {
+            "stock_code": stock_code,
+            "company_name": "Test",
+            "report_period_date": date(year, 12, 31),
+            "report_year": year,
+            "report_month": 12,
+            "pub_date": date(year, 12, 31),
+            "shares_issued_excl_treasury": excl_treasury if excl_treasury is not None else total,
+            "shares_treasury": 0,
+            "shares_total_issued": total,
+            "source_pdf_url": f"https://x/{stock_code}/{year}.pdf",
+        }
+        self.cache.save_hkex_share_capital(rec)
+
+    def _base_data(self, ticker="00700.HK", years=(2020, 2021)):
+        return {
+            "ticker": ticker,
+            "company_name": "T",
+            "currency": "HKD",
+            "amount_unit": "absolute",
+            "market_currency": "HKD",
+            "exchange_rate_to_reporting_currency": [1.0] * len(years),
+            "closing_exchange_rate_to_reporting_currency": [1.0] * len(years),
+            "years": list(years),
+            "financials": {
+                "shares_outstanding": [111_000_000] * len(years),  # wrong, should be overridden
+                "avg_stock_price": [10.0] * len(years),
+                "closing_stock_price": [12.0] * len(years),
+            },
+        }
+
+    def test_overrides_shares_with_hkex_year_end_excl_treasury(self):
+        self._seed_hkex_year_end("00700", 2020, total=200_000_000, excl_treasury=190_000_000)
+        data = self._base_data()
+        self.manager._enrich_shares_from_hkex(data)
+        # 2020 overridden to the excl-treasury figure; 2021 (no HKEX data) stays
+        self.assertEqual(data["financials"]["shares_outstanding"][0], 190_000_000.0)
+        self.assertEqual(data["financials"]["shares_outstanding"][1], 111_000_000)
+
+    def test_falls_back_to_total_issued_when_excl_treasury_missing(self):
+        # Legacy monthly returns parsed treasury=0 and excl=total; if excl were
+        # 0/None we should fall back to total_issued.
+        rec = {
+            "stock_code": "00700", "company_name": "T",
+            "report_period_date": date(2020, 12, 31), "report_year": 2020,
+            "report_month": 12, "pub_date": date(2020, 12, 31),
+            "shares_issued_excl_treasury": 0, "shares_treasury": 0,
+            "shares_total_issued": 200_000_000, "source_pdf_url": "u",
+        }
+        self.cache.save_hkex_share_capital(rec)
+        data = self._base_data()
+        self.manager._enrich_shares_from_hkex(data)
+        self.assertEqual(data["financials"]["shares_outstanding"][0], 200_000_000.0)
+
+    def test_no_hkex_data_leaves_shares_untouched(self):
+        data = self._base_data()
+        original = list(data["financials"]["shares_outstanding"])
+        self.manager._enrich_shares_from_hkex(data)
+        self.assertEqual(data["financials"]["shares_outstanding"], original)
+
+    def test_unparseable_ticker_does_not_crash(self):
+        data = self._base_data(ticker="NOT_A_TICKER")
+        # Should return data unchanged without raising.
+        self.manager._enrich_shares_from_hkex(data)
+        self.assertEqual(data["financials"]["shares_outstanding"][0], 111_000_000)
+
+    def test_loss_year_eps_zero_gets_hkex_override(self):
+        # The Futu provider's EPS fallback yields 0.0 for loss years (EPS=0).
+        # HKEX override must rescue it rather than the schema's >0 check failing.
+        data = self._base_data()
+        data["financials"]["shares_outstanding"] = [0.0, 111_000_000]
+        self._seed_hkex_year_end("00700", 2020, total=200_000_000)
+        self.manager._enrich_shares_from_hkex(data)
+        self.assertEqual(data["financials"]["shares_outstanding"][0], 200_000_000.0)
+
+
+class ClosingStockPriceFallbackTest(unittest.TestCase):
+    """Verifies normalizer + schema fill closing_stock_price from avg when absent
+    (legacy cached data), so period-end market cap degrades gracefully.
+    """
+    def test_normalizer_fills_closing_from_avg_when_missing(self):
+        from datalayer.normalizer import normalize_audit_data
+        raw = {
+            "ticker": "00700.HK", "company_name": "T", "currency": "HKD",
+            "amount_unit": "absolute", "market_currency": "HKD",
+            "exchange_rate_to_reporting_currency": [1.0, 1.0],
+            "closing_exchange_rate_to_reporting_currency": [1.0, 1.0],
+            "years": [2020, 2021],
+            "financials": {
+                "shares_outstanding": [100.0, 100.0],
+                "avg_stock_price": [10.0, 12.0],
+                # closing_stock_price intentionally absent
+            },
+        }
+        out = normalize_audit_data(raw)
+        self.assertEqual(out["financials"]["closing_stock_price"], [10.0, 12.0])
+
+    def test_normalizer_fills_closing_from_avg_when_non_positive(self):
+        from datalayer.normalizer import normalize_audit_data
+        raw = {
+            "ticker": "X", "company_name": "T", "currency": "HKD",
+            "amount_unit": "absolute", "market_currency": "HKD",
+            "exchange_rate_to_reporting_currency": [1.0],
+            "closing_exchange_rate_to_reporting_currency": [1.0],
+            "years": [2020],
+            "financials": {
+                "shares_outstanding": [100.0],
+                "avg_stock_price": [15.0],
+                "closing_stock_price": [0.0],  # non-positive → fallback to avg
+            },
+        }
+        out = normalize_audit_data(raw)
+        self.assertEqual(out["financials"]["closing_stock_price"], [15.0])
+
 
 if __name__ == "__main__":
     unittest.main()

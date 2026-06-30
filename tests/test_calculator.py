@@ -34,6 +34,7 @@ def make_sample_input() -> CompanyAuditInput:
             "goodwill": [10, 10, 10, 10, 10, 10],
             "shares_outstanding": [100000000, 99000000, 98000000, 97000000, 96000000, 95000000],
             "avg_stock_price": [10, 11, 12, 13, 14, 15],
+            "closing_stock_price": [10.5, 10.0, 13.0, 12.5, 15.0, 14.0],
         },
     )
 
@@ -46,7 +47,27 @@ class FinancialCalculatorTest(unittest.TestCase):
         self.assertEqual(df.loc[2020, "NOPAT"], 96)
         self.assertEqual(df.loc[2020, "Invested_Capital"], 600)
         self.assertEqual(df.loc[2020, "Owner_Earnings"], 100)
-        self.assertEqual(df.loc[2020, "Market_Cap"], 1000)
+        # Period-end market cap = shares × closing_price × closing_FX.
+        # 100M shares × 10.5 close × 1.0 FX = 1.05B; in millions → 1050.
+        self.assertEqual(df.loc[2020, "Market_Cap"], 1050)
+
+    def test_market_cap_uses_period_end_basis(self):
+        """Market_Cap must use closing_stock_price (not avg) × closing FX."""
+        calculator = FinancialCalculator(make_sample_input(), maintenance_capex_ratio=0.5)
+        df = calculator.df
+        for i, year in enumerate([2020, 2021, 2022, 2023, 2024, 2025]):
+            shares = 100000000 - i * 1000000  # 100M, 99M, 98M, ...
+            close = [10.5, 10.0, 13.0, 12.5, 15.0, 14.0][i]
+            expected_mc = shares * close * 1.0 / 1e6  # million unit, FX=1
+            self.assertAlmostEqual(
+                df.loc[year, "Market_Cap"], expected_mc, places=6,
+                msg=f"Market_Cap for {year} should use closing price {close}, not avg",
+            )
+        # Sanity: avg-based market cap would differ for at least one year.
+        self.assertNotEqual(
+            df.loc[2020, "Market_Cap"],
+            100000000 * 10 / 1e6,  # avg-based would be 1000
+        )
 
     def test_processed_df_contains_roiic_and_one_dollar_rule(self):
         calculator = FinancialCalculator(make_sample_input(), maintenance_capex_ratio=0.5)
