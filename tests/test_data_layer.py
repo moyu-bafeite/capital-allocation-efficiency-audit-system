@@ -110,6 +110,54 @@ class DataLayerTest(unittest.TestCase):
         self.assertEqual(normalized["financials"]["avg_stock_price"][1], 10.0)
         self.assertGreater(normalized["financials"]["buybacks_shares"][1], 0.0)
 
+    def test_normalizer_rounds_display_fields_absolute_mode(self):
+        raw_data = {
+            "years": [2020, 2021],
+            "currency": "USD",
+            "amount_unit": "absolute",
+            "market_currency": "HKD",
+            "exchange_rate_to_reporting_currency": [0.8765432109876543, 0.9123456789012345],
+            "closing_exchange_rate_to_reporting_currency": [0.8811111111111111, 0.9099999999999999],
+            "financials": {
+                "net_profit": [100000000.0, 120000000.0],
+                "ebit": [120000000.0, 140000000.0],
+                "tax_rate": [0.18234567, 0.20987654],
+                "avg_stock_price": [12.3456789, 15.9876543],
+                "buybacks_paid": [1234567.891234567, 9876543.219999999],
+                "buybacks_shares": [100000.0, 200000.0],
+            },
+        }
+        normalized = normalize_audit_data(raw_data)
+        self.assertEqual(normalized["exchange_rate_to_reporting_currency"], [0.8765, 0.9123])
+        self.assertEqual(normalized["closing_exchange_rate_to_reporting_currency"], [0.8811, 0.91])
+        self.assertEqual(normalized["financials"]["tax_rate"], [0.1823, 0.2099])
+        self.assertEqual(normalized["financials"]["avg_stock_price"], [12.3457, 15.9877])
+        self.assertEqual(normalized["financials"]["buybacks_paid"], [1234568.0, 9876543.0])
+
+    def test_normalizer_rounds_display_fields_million_mode(self):
+        raw_data = {
+            "years": [2020, 2021],
+            "currency": "USD",
+            "amount_unit": "million",
+            "market_currency": "HKD",
+            "exchange_rate_to_reporting_currency": [0.8765432109876543, 0.9123456789012345],
+            "closing_exchange_rate_to_reporting_currency": [0.8811111111111111, 0.9099999999999999],
+            "financials": {
+                "net_profit": [100.0, 120.0],
+                "ebit": [120.0, 140.0],
+                "tax_rate": [0.18234567, 0.20987654],
+                "avg_stock_price": [12.3456789, 15.9876543],
+                "buybacks_paid": [12.3456789, 9.8765432],
+                "buybacks_shares": [100000.0, 200000.0],
+            },
+        }
+        normalized = normalize_audit_data(raw_data)
+        self.assertEqual(normalized["exchange_rate_to_reporting_currency"], [0.8765, 0.9123])
+        self.assertEqual(normalized["closing_exchange_rate_to_reporting_currency"], [0.8811, 0.91])
+        self.assertEqual(normalized["financials"]["tax_rate"], [0.1823, 0.2099])
+        self.assertEqual(normalized["financials"]["avg_stock_price"], [12.3457, 15.9877])
+        self.assertEqual(normalized["financials"]["buybacks_paid"], [12.345679, 9.876543])
+
     def test_normalizer_handles_optional_non_cash_adjustment_fields(self):
         # Case A: Fields are completely missing
         raw_data_missing = {

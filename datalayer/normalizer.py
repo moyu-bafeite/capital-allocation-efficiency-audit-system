@@ -139,5 +139,21 @@ def normalize_audit_data(raw_data: Dict[str, Any]) -> Dict[str, Any]:
     else:
         data["closing_exchange_rate_to_reporting_currency"] = data.get("exchange_rate_to_reporting_currency", [1.0] * num_years)
 
+    # 6. Round display/cached fields to sensible precision.
+    amount_unit = data.get("amount_unit", "absolute")
+    data["exchange_rate_to_reporting_currency"] = [
+        round(float(v), 4) for v in data["exchange_rate_to_reporting_currency"]
+    ]
+    data["closing_exchange_rate_to_reporting_currency"] = [
+        round(float(v), 4) for v in data["closing_exchange_rate_to_reporting_currency"]
+    ]
+    if "tax_rate" in financials:
+        financials["tax_rate"] = [round(float(v), 4) for v in financials["tax_rate"]]
+    if "avg_stock_price" in financials:
+        financials["avg_stock_price"] = [round(float(v), 2) for v in financials["avg_stock_price"]]
+    paid_decimals = 0 if amount_unit == "absolute" else 6
+    if "buybacks_paid" in financials:
+        financials["buybacks_paid"] = [round(float(v), paid_decimals) for v in financials["buybacks_paid"]]
+
     data["financials"] = financials
     return data
