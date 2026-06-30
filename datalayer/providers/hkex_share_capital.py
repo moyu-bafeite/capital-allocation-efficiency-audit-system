@@ -18,12 +18,12 @@ import re
 import time
 import calendar
 from datetime import date, datetime
-from io import BytesIO
 from typing import Dict, List, Optional, Set, Tuple
 
 import requests
 from bs4 import BeautifulSoup
-from pypdf import PdfReader
+
+from datalayer.providers.hkex_pdf_parser import _extract_pub_date_from_url
 
 logger = logging.getLogger(__name__)
 
@@ -99,19 +99,52 @@ class HkexShareCapitalFetcher:
     ) -> List[Dict[str, object]]:
         """Fetch all monthly return records whose publication date falls in [start, end].
 
+        Backward-compatible wrapper around :meth:`fetch_range_with_failures`
+        that discards the failure list. New callers wanting parse-failure
+        details should call ``fetch_range_with_failures`` directly.
+
+        :return: List of successfully parsed record dicts (see
+            :meth:`fetch_range_with_failures` for the dict shape).
+        :raises HkexFetchError: If a non-recoverable error occurs for this ticker.
+        """
+        records, _failures = self.fetch_range_with_failures(
+            stock_code, start, end, existing_periods=existing_periods,
+        )
+        return records
+
+    def fetch_range_with_failures(
+        self,
+        stock_code: str,
+        start: date,
+        end: date,
+        existing_periods: Optional[Set[date]] = None,
+    ) -> Tuple[List[Dict[str, object]], List[Dict[str, object]]]:
+        """Fetch monthly returns in [start, end]; return parsed records AND failures.
+
+        Same behavior as :meth:`fetch_range`, but instead of silently dropping
+        PDFs/DOCs that fail to parse (only logging a warning), it returns them
+        as a second list so callers (CLI dry-run table, UI review panel) can
+        surface them to the user.
+
         :param stock_code: Ticker in any format accepted by normalize_stock_code.
         :param start: Inclusive start date (publication date).
         :param end: Inclusive end date (publication date).
         :param existing_periods: Optional set of report_period_date values
-            already stored in the DB. When provided, PDFs whose report period
+            already stored in the DB. When provided, files whose report period
             (estimated from the URL) is in this set are skipped — avoiding
             redundant downloads for periods already present. Pass None to
-            fetch everything (the default, backward-compatible behavior).
-        :return: List of record dicts. Each dict has keys: stock_code, company_name,
-            report_period_date (date), report_year, report_month, pub_date (date),
-            shares_issued_excl_treasury, shares_treasury, shares_total_issued,
-            source_pdf_url.
-        :raises HkexFetchError: If a non-recoverable error occurs for this ticker.
+            fetch everything (the default).
+        :return: Tuple ``(records, failures)``.
+            * ``records``: successfully parsed dicts with keys stock_code,
+              company_name, report_period_date (date), report_year,
+              report_month, pub_date (date|None), shares_issued_excl_treasury,
+              shares_treasury, shares_total_issued, source_pdf_url.
+            * ``failures``: dicts for files that could not be parsed, with keys
+              stock_code, company_name, source_pdf_url, report_period_date
+              (date|None, estimated from URL), report_month (int|None),
+              error (str). These cannot be persisted.
+        :raises HkexFetchError: If a non-recoverable error occurs for this ticker
+            (e.g. stockId lookup or search fails).
         """
         code_5 = normalize_stock_code(stock_code)
         logger.info("Fetching HKEX monthly returns for %s (normalized: %s) from %s to %s",
@@ -121,9 +154,9 @@ class HkexShareCapitalFetcher:
         logger.debug("Resolved stockId=%s, company_name=%s", stock_id, company_name)
 
         pdf_links = self._search_monthly_returns(stock_id, start, end)
-        logger.info("Found %d monthly return PDF(s) for %s in range", len(pdf_links), code_5)
+        logger.info("Found %d monthly return file(s) for %s in range", len(pdf_links), code_5)
 
-        # Skip PDFs whose report period is already in the DB (deduplication).
+        # Skip files whose report period is already in the DB (deduplication).
         # The estimate uses the publication date encoded in the URL; the actual
         # report period is confirmed only after parsing, but the URL-based
         # estimate is reliable enough to avoid the download for already-stored
@@ -140,27 +173,52 @@ class HkexShareCapitalFetcher:
                 kept.append(url)
             if skipped:
                 logger.info(
-                    "Skipping %d already-stored PDF(s); %d to fetch", skipped, len(kept)
+                    "Skipping %d already-stored file(s); %d to fetch", skipped, len(kept)
                 )
             pdf_links = kept
 
         records: List[Dict[str, object]] = []
+        failures: List[Dict[str, object]] = []
         for i, pdf_url in enumerate(pdf_links):
             if i > 0 and self.delay > 0:
                 time.sleep(self.delay)
             try:
-                rec = self._extract_shares_from_pdf(pdf_url, code_5, company_name)
+                rec = self._extract_shares_from_pdf_or_doc(pdf_url, code_5, company_name)
                 if rec is not None:
                     records.append(rec)
                     logger.debug("Parsed %s: %s shares as of %s",
                                  rec["source_pdf_url"], rec["shares_issued_excl_treasury"],
                                  rec["report_period_date"])
+                else:
+                    # Parser returned None (e.g. couldn't locate Section II).
+                    est = _estimate_report_period_from_url(pdf_url)
+                    failures.append({
+                        "stock_code": code_5,
+                        "company_name": company_name,
+                        "source_pdf_url": pdf_url,
+                        "report_period_date": est,
+                        "report_month": est.month if est is not None else None,
+                        "error": "parse returned None",
+                    })
+                    logger.warning("Failed to parse %s: parse returned None", pdf_url)
             except Exception as exc:
                 logger.warning("Failed to parse %s: %s", pdf_url, exc)
+                est = _estimate_report_period_from_url(pdf_url)
+                failures.append({
+                    "stock_code": code_5,
+                    "company_name": company_name,
+                    "source_pdf_url": pdf_url,
+                    "report_period_date": est,
+                    "report_month": est.month if est is not None else None,
+                    "error": str(exc),
+                })
 
-        # Sort by report_period_date ascending for deterministic output
+        # Sort by report_period_date ascending for deterministic output.
+        # Failures with a None estimate sort first (earliest).
         records.sort(key=lambda r: r["report_period_date"])
-        return records
+        failures.sort(key=lambda f: (f["report_period_date"] is None,
+                                     f["report_period_date"] or date.min))
+        return records, failures
 
     # ------------------------------------------------------------------
     # Step 1: stockId lookup via prefix.do JSONP endpoint
@@ -279,7 +337,10 @@ class HkexShareCapitalFetcher:
         html = self._post_text(action_url, data=form_data)
         soup = BeautifulSoup(html, "html.parser")
         links: List[str] = []
-        for a in soup.select("a[href$='.pdf']"):
+        # Include .doc alongside .pdf: a minority of small issuers (e.g. 00837)
+        # uploaded Word .doc files instead of PDFs for the legacy period. The
+        # parser routes by extension; .doc is handled by hkex_doc_parser.
+        for a in soup.select("a[href$='.pdf'], a[href$='.doc']"):
             href = a["href"]
             if not href.startswith("http"):
                 href = BASE_URL + href
@@ -287,55 +348,24 @@ class HkexShareCapitalFetcher:
         return links
 
     # ------------------------------------------------------------------
-    # Step 3: download & parse a single monthly return PDF
+    # Step 3: download & parse a single monthly return (PDF or DOC)
     # ------------------------------------------------------------------
-    def _extract_shares_from_pdf(
-        self, pdf_url: str, stock_code: str, company_name: str
+    def _extract_shares_from_pdf_or_doc(
+        self, doc_url: str, stock_code: str, company_name: str
     ) -> Optional[Dict[str, object]]:
-        content = self._get_bytes(pdf_url)
-        reader = PdfReader(BytesIO(content))
-        if len(reader.pages) < 2:
-            logger.warning("PDF has fewer than 2 pages, skipping: %s", pdf_url)
-            return None
+        """Download a monthly-return file and parse its share-capital data.
 
-        page0_text = reader.pages[0].extract_text() or ""
-        page1_text = reader.pages[1].extract_text() or ""
-
-        # Report period e.g. "30 November 2024"
-        m_period = re.search(
-            r"For the month ended:\s*([^\n]+?)\s*Status", page0_text
-        )
-        period_str = m_period.group(1).strip() if m_period else ""
-        report_period_date = _parse_month_ended(period_str)
-        if report_period_date is None:
-            logger.warning("Could not parse report period '%s' from %s", period_str, pdf_url)
-            return None
-
-        # Section II title differs between PDF format versions:
-        #   v1.1.1+: "II. Movements in Issued Shares and/or Treasury Shares"
-        #            → 3 columns: (issued excl treasury, treasury, total)
-        #   v1.0.x : "II. Movements in Issued Shares"
-        #            → 1 column: (total issued; treasury concept absent)
-        issued_excl_treasury, treasury, total_issued = _parse_section_ii(page1_text)
-        if total_issued is None:
-            logger.warning("Could not parse section II 'Balance at close of the month' from %s", pdf_url)
-            return None
-
-        # Publication date: HKEX PDF URL convention is /YYYY/MMDD/<file>.pdf
-        pub_date = _extract_pub_date_from_url(pdf_url)
-
-        return {
-            "stock_code": stock_code,
-            "company_name": company_name,
-            "report_period_date": report_period_date,
-            "report_year": report_period_date.year,
-            "report_month": report_period_date.month,
-            "pub_date": pub_date,
-            "shares_issued_excl_treasury": issued_excl_treasury,
-            "shares_treasury": treasury,
-            "shares_total_issued": total_issued,
-            "source_pdf_url": pdf_url,
-        }
+        Routes by URL extension: ``.doc`` → :mod:`hkex_doc_parser`, otherwise
+        (``.pdf``) → :mod:`hkex_pdf_parser` (which auto-detects FF301 新版 /
+        March 2019 旧版). Thin bridge between the HTTP layer
+        (``self._get_bytes``) and the pure-parsing modules.
+        """
+        content = self._get_bytes(doc_url)
+        if doc_url.lower().endswith(".doc"):
+            from datalayer.providers.hkex_doc_parser import parse_share_capital_doc
+            return parse_share_capital_doc(content, stock_code, company_name, doc_url)
+        from datalayer.providers.hkex_pdf_parser import parse_share_capital_pdf
+        return parse_share_capital_pdf(content, stock_code, company_name, doc_url)
 
     # ------------------------------------------------------------------
     # HTTP helpers with retry
@@ -374,69 +404,12 @@ class HkexShareCapitalFetcher:
 
 
 # ----------------------------------------------------------------------
-# Module-level parsing helpers
+# Module-level helpers
 # ----------------------------------------------------------------------
-_MONTH_NAMES = {
-    "january": 1, "february": 2, "march": 3, "april": 4, "may": 5, "june": 6,
-    "july": 7, "august": 8, "september": 9, "october": 10, "november": 11,
-    "december": 12,
-    # short forms seen in some extracted texts
-    "jan": 1, "feb": 2, "mar": 3, "apr": 4, "jun": 6, "jul": 7,
-    "aug": 8, "sep": 9, "sept": 9, "oct": 10, "nov": 11, "dec": 12,
-}
-
-
-def _parse_month_ended(period_str: str) -> Optional[date]:
-    """Parses '30 November 2024' or 'November 30, 2024' into a date.
-
-    Returns the last day of that month (the monthly return always reports
-    month-end, so for a parsed (year, month, day) we take the parsed day if
-    present, otherwise the last day of the month).
-    """
-    if not period_str:
-        return None
-    s = period_str.strip()
-    # Try "DD MonthName YYYY"
-    m = re.match(r"(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})", s)
-    if m:
-        day, month_name, year = int(m.group(1)), m.group(2).lower(), int(m.group(3))
-        month = _MONTH_NAMES.get(month_name)
-        if month:
-            try:
-                return date(year, month, day)
-            except ValueError:
-                return None
-    # Try "MonthName DD, YYYY"
-    m = re.match(r"([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})", s)
-    if m:
-        month_name, day, year = m.group(1).lower(), int(m.group(2)), int(m.group(3))
-        month = _MONTH_NAMES.get(month_name)
-        if month:
-            try:
-                return date(year, month, day)
-            except ValueError:
-                return None
-    return None
-
-
-def _extract_pub_date_from_url(pdf_url: str) -> Optional[date]:
-    """Extracts the publication date from a HKEX PDF URL.
-
-    HKEX convention: /listedco/listconews/sehk/YYYY/MMDD/<filename>.pdf
-    where YYYY-MMDD is the publication date.
-    """
-    m = re.search(r"/(\d{4})(\d{4})\d{3,}\.pdf$", pdf_url)
-    if not m:
-        return None
-    year = int(m.group(1))
-    month = int(m.group(2)[:2])
-    day = int(m.group(2)[2:])
-    try:
-        return date(year, month, day)
-    except ValueError:
-        return None
-
-
+# PDF parsing helpers (_MONTH_NAMES, _parse_month_ended, _parse_section_ii,
+# _extract_pub_date_from_url, parse_share_capital_pdf) live in
+# datalayer.providers.hkex_pdf_parser. Only the URL-based report-period
+# estimator remains here, used by fetch_range for download deduplication.
 def _estimate_report_period_from_url(pdf_url: str) -> Optional[date]:
     """Estimates the report period (month-end) from a monthly return PDF URL.
 
@@ -458,44 +431,3 @@ def _estimate_report_period_from_url(pdf_url: str) -> Optional[date]:
         rp_year, rp_month = pub.year, pub.month - 1
     _, last_day = calendar.monthrange(rp_year, rp_month)
     return date(rp_year, rp_month, last_day)
-
-
-def _parse_section_ii(page1_text: str) -> Tuple[Optional[int], int, Optional[int]]:
-    """Parses the "Balance at close of the month" line from Section II.
-
-    Handles two PDF format versions:
-      - New (v1.1.1+): "Movements in Issued Shares and/or Treasury Shares"
-        → 3 columns: (issued_excl_treasury, treasury, total_issued)
-      - Old (v1.0.x): "Movements in Issued Shares"
-        → 1 column: (total_issued) — treasury concept did not exist
-
-    Some issuers (e.g. HSBC) report multiple share classes in Section II
-    (Ordinary shares then Preference shares). The FF301 form always lists
-    Ordinary shares as the first class, so we take the FIRST match on the
-    page — which is the primary listed ordinary share count we care about.
-
-    Returns (issued_excl_treasury, treasury, total_issued). In the old format,
-    issued_excl_treasury is set equal to total_issued and treasury is 0.
-    Returns (None, 0, None) if no match is found.
-    """
-    # Try the 3-column (new) format first. Take the FIRST match on the page:
-    # page 2 only contains Section II, and the first share class listed is
-    # invariably Ordinary shares (the primary listed class).
-    matches_3 = re.findall(
-        r"Balance at close of the month\s+([\d,]+)\s+([\d,]+)\s+([\d,]+)",
-        page1_text,
-    )
-    if matches_3:
-        a, b, c = matches_3[0]
-        return int(a.replace(",", "")), int(b.replace(",", "")), int(c.replace(",", ""))
-
-    # Fall back to the 1-column (old) format.
-    matches_1 = re.findall(
-        r"Balance at close of the month\s+([\d,]+)",
-        page1_text,
-    )
-    if matches_1:
-        total = int(matches_1[0].replace(",", ""))
-        return total, 0, total
-
-    return None, 0, None

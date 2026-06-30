@@ -31,7 +31,9 @@
 
 ```text
 .
-├── app.py                  # Streamlit 应用入口
+├── app.py                  # 审计主应用 Streamlit 入口
+├── hkex_app.py             # HKEX 股本变动工作台 Streamlit 入口（独立子应用）
+├── hkex_app/               # 子应用包（i18n/主题/存储/图表/页面，与主应用解耦）
 ├── core/
 │   ├── auditor.py          # 审计模块轻量编排器
 │   ├── buyback_audit.py    # 股份回购纪律审计
@@ -42,7 +44,7 @@
 │   ├── cache.py            # DuckDB 本地缓存读写
 │   ├── manager.py          # 数据管理器（缓存命中 → API 拉取 → 持久化）
 │   ├── normalizer.py       # 财务数据清洗与归一化
-│   └── providers/          # 行情 API 适配器（Futu 等）
+│   └── providers/          # 行情 API 适配器（Futu / HKEX 月报表等）
 ├── models/
 │   └── input_schema.py     # 输入数据结构与校验规则
 ├── services/
@@ -53,8 +55,10 @@
 │       ├── renderer.py     # Plotly 图表 → PNG 静态化
 │       ├── sections.py     # 七大审计板块 HTML 片段构建
 │       └── template.py     # Jinja2 HTML 模板与 CSS 样式
-├── tests/                  # 核心量化逻辑单元测试
-├── ui/                     # Streamlit 页面与侧边栏模块
+├── scripts/
+│   └── hkex_sync.py        # HKEX 月报表抓取同步 CLI（大区间回填推荐）
+├── tests/                  # 核心量化逻辑与子应用存储单元测试
+├── ui/                     # 审计主应用 Streamlit 页面与侧边栏模块
 ├── requirements.txt        # Python 依赖
 └── README.md
 ```
@@ -91,6 +95,25 @@ streamlit run app.py
 ```text
 http://localhost:8501
 ```
+
+## HKEX 股本变动工作台（独立应用）
+
+`hkex_app.py` 是与审计主应用 `app.py` 完全解耦的独立 Streamlit 工具，专用于港交所「证券变动月报表」的抓取、浏览与对比。所有子应用模块位于 `hkex_app/` 包内，不共享 `ui/`、`services/`、`core/` 与根 `i18n/`，仅复用底层 `datalayer/` 抓取与缓存层（`DatabaseCache` 作父类扩展、`HkexShareCapitalFetcher` 直接调用）。
+
+```bash
+streamlit run hkex_app.py
+```
+
+功能：
+
+- **查看数据**：选 ticker 与年份范围，展示股本变动趋势折线图（已发行不含库存 / 库存股 / 总发行三条线）与明细表格，附最新一期、较最早变化率等摘要指标。
+- **抓取数据**：交互式替代 `scripts/hkex_sync.py`，支持显式日期区间与增量模式（从最新记录次日）、force 重抓、限速与重试配置；抓取后进入审阅面板，勾选确认后方写入 DuckDB。
+- **多 Ticker 对比**：2–5 只股票总发行股本曲线横向对比，支持绝对值与归一化（首期=100）两种量纲。
+- **记录管理**：逐条删除或单期强制重抓已入库记录；底部「危险区」可清空整只 ticker 的全部记录（折叠 + 二次确认）。
+
+子应用自带独立 i18n（中英双语，默认 English，语言状态与主应用互不干扰）与独立视觉风格。多 Ticker、多年份的大区间全量回填仍建议使用 `scripts/hkex_sync.py` CLI，避免 UI 长时间阻塞。
+
+> 子应用测试：`python -m unittest tests.test_hkex_app_store`
 
 ## 审计报告导出
 

@@ -254,10 +254,10 @@ def _process_ticker(
                 stock_code, len(existing_periods),
             )
 
-    records = fetcher.fetch_range(
+    records, failures = fetcher.fetch_range_with_failures(
         stock_code, start_date, end_date, existing_periods=existing_periods
     )
-    if not records:
+    if not records and not failures:
         logger.info("[%s] No monthly returns found in range %s..%s.",
                     stock_code, start_date, end_date)
         return 0, 0
@@ -265,9 +265,11 @@ def _process_ticker(
     written = 0
     failed = 0
     if args.dry_run:
-        company_name = records[0].get("company_name", "") if records else ""
-        print(_format_records_table(records, stock_code, company_name))
+        company_name = (records[0].get("company_name") if records
+                        else failures[0].get("company_name") if failures else "")
+        print(_format_records_table(records, failures, stock_code, company_name))
         written = len(records)
+        failed = len(failures)
     else:
         for rec in records:
             try:
@@ -277,6 +279,10 @@ def _process_ticker(
                 logger.warning("[%s] Failed to persist record for %s: %s",
                                stock_code, rec["report_period_date"], exc)
                 failed += 1
+        # Parse failures (files that could not be parsed at all) are counted
+        # separately so the summary reflects both parse failures and DB-write
+        # failures. They are already logged by fetch_range_with_failures.
+        failed += len(failures)
 
     logger.info(
         "[%s] Done: %d records %s, %d failed.",
@@ -291,36 +297,81 @@ def _process_ticker(
 # ----------------------------------------------------------------------
 # Dry-run table rendering
 # ----------------------------------------------------------------------
+# (header, key, align, format_func)
 _TABLE_COLUMNS = [
-    # (header, key, align, format_func)
-    ("Mo", "report_month", "left", lambda v: f"{int(v):02d}"),
-    ("PeriodEnd", "report_period_date", "left", lambda v: str(v)),
-    ("PubDate", "pub_date", "left", lambda v: str(v) if v is not None else ""),
-    ("Issued(excl treas)", "shares_issued_excl_treasury", "right", lambda v: f"{int(v):,}"),
-    ("Treasury", "shares_treasury", "right", lambda v: f"{int(v):,}"),
-    ("Total Issued", "shares_total_issued", "right", lambda v: f"{int(v):,}"),
+    ("Status", "_status", "left", lambda v: str(v)),
+    ("Mo", "report_month", "left", lambda v: f"{int(v):02d}" if v is not None else "—"),
+    ("PeriodEnd", "report_period_date", "left", lambda v: str(v) if v is not None else "—"),
+    ("PubDate", "pub_date", "left", lambda v: str(v) if v is not None else "—"),
+    ("Issued(excl treas)", "shares_issued_excl_treasury", "right",
+     lambda v: f"{int(v):,}" if v is not None else "—"),
+    ("Treasury", "shares_treasury", "right",
+     lambda v: f"{int(v):,}" if v is not None else "—"),
+    ("Total Issued", "shares_total_issued", "right",
+     lambda v: f"{int(v):,}" if v is not None else "—"),
     ("Source PDF", "source_pdf_url", "left", lambda v: str(v) if v is not None else ""),
+    ("Reason", "_reason", "left", lambda v: str(v) if v else ""),
 ]
 
 
-def _format_records_table(records: list, stock_code: str, company_name: str) -> str:
-    """Renders a list of HKEX share-capital records as a Unicode-bordered table.
+def _format_records_table(
+    records: list,
+    failures: list,
+    stock_code: str,
+    company_name: str,
+) -> str:
+    """Render parsed records AND parse failures as one Unicode-bordered table.
 
-    stock_code and company_name are shown in the caption line (they are
-    constant across all rows of a single ticker) and thus excluded from the
-    columns to keep the table compact. Output is a multi-line string without
-    any log prefix, suitable for print().
+    Pass rows carry share counts; Failed rows show "—" for the numeric columns
+    and the parse error in the Reason column. Rows are merged and sorted by
+    ``report_period_date`` ascending (failures with a None estimate sort
+    first), so pass/fail rows for the same period interleave for easy
+    diagnosis. ``stock_code`` and ``company_name`` are shown in the caption
+    line (constant across all rows of a single ticker).
     """
+    n_pass = len(records)
+    n_fail = len(failures)
     name_part = f" ({company_name})" if company_name else ""
-    caption = f"=== {stock_code}{name_part} — {len(records)} record(s) (dry-run) ==="
+    caption = (f"=== {stock_code}{name_part} — {n_pass} pass, "
+               f"{n_fail} failed (dry-run) ===")
 
-    if not records:
+    if n_pass == 0 and n_fail == 0:
         return caption + "\n(no records)"
 
-    # Format every cell first so column widths reflect the rendered strings.
-    rows: List[List[str]] = []
+    # Build a unified row list. Each row is a dict carrying the column keys
+    # plus _status ("Pass"/"Failed") and _reason (error string for failures).
+    all_rows: List[dict] = []
     for rec in records:
-        rows.append([fmt(rec.get(key)) for (_, key, _, fmt) in _TABLE_COLUMNS])
+        row = dict(rec)
+        row["_status"] = "Pass"
+        row["_reason"] = ""
+        all_rows.append(row)
+    for f in failures:
+        # Failures lack pub_date and share fields; default them to None so the
+        # format funcs render "—" uniformly.
+        row = {
+            "stock_code": f.get("stock_code"),
+            "company_name": f.get("company_name"),
+            "report_period_date": f.get("report_period_date"),
+            "report_month": f.get("report_month"),
+            "pub_date": None,
+            "shares_issued_excl_treasury": None,
+            "shares_treasury": None,
+            "shares_total_issued": None,
+            "source_pdf_url": f.get("source_pdf_url"),
+            "_status": "Failed",
+            "_reason": f.get("error", ""),
+        }
+        all_rows.append(row)
+
+    # Sort by report_period_date ascending; None (un-estimable) sorts last.
+    all_rows.sort(key=lambda r: (r["report_period_date"] is None,
+                                 r["report_period_date"] or date.min))
+
+    # Format every cell so column widths reflect the rendered strings.
+    rendered: List[List[str]] = []
+    for row in all_rows:
+        rendered.append([fmt(row.get(key)) for (_, key, _, fmt) in _TABLE_COLUMNS])
 
     headers = [h for (h, _, _, _) in _TABLE_COLUMNS]
     aligns = [a for (_, _, a, _) in _TABLE_COLUMNS]
@@ -328,7 +379,7 @@ def _format_records_table(records: list, stock_code: str, company_name: str) -> 
     # Compute column widths: max of header and all cells in that column.
     col_widths = []
     for col_idx, header in enumerate(headers):
-        cell_w = max(len(row[col_idx]) for row in rows)
+        cell_w = max(len(row[col_idx]) for row in rendered) if rendered else 0
         col_widths.append(max(len(header), cell_w))
 
     def _pad(cell: str, width: int, align: str) -> str:
@@ -345,10 +396,9 @@ def _format_records_table(records: list, stock_code: str, company_name: str) -> 
     sep = "├" + "┼".join("─" * (w + 2) for w in col_widths) + "┤"
     bottom = "└" + "┴".join("─" * (w + 2) for w in col_widths) + "┘"
 
-    # Headers are always left-aligned (a common table convention) regardless
-    # of the data alignment for that column.
+    # Headers are always left-aligned regardless of the data alignment.
     lines = [caption, top, _row(headers, align_override="left"), sep]
-    lines.extend(_row(row) for row in rows)
+    lines.extend(_row(row) for row in rendered)
     lines.append(bottom)
     return "\n".join(lines)
 
