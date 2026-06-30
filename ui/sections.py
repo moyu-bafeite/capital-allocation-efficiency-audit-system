@@ -300,7 +300,6 @@ def render_earnings_quality_section(data: CompanyAuditInput, result: AuditResult
     st.markdown(t("section.eq.intro.bullet2"))
     st.markdown(t("section.eq.intro.bullet3"))
     st.markdown(t("section.eq.intro.bullet4"))
-    st.markdown(t("section.eq.intro.bullet5"))
 
     st.plotly_chart(
         create_earnings_quality_chart(result.audited_df),
@@ -342,8 +341,8 @@ def render_earnings_quality_section(data: CompanyAuditInput, result: AuditResult
         st.info(t("section.eq.oeps_cagr", n_years=len(oe_vals), cagr=oe_cagr))
 
     st.markdown(f"**{t('section.eq.guidance.header')}**\n")
-    st.markdown(f"A. {t('section.eq.guidance.bullet1')}\n")
-    st.markdown(f"B. {t('section.eq.guidance.bullet2')}\n")
+    st.markdown(f"{t('section.eq.guidance.bullet1')}\n")
+    st.markdown(f"{t('section.eq.guidance.bullet2')}\n")
 
 
 def render_checklist_section(result: AuditResult) -> None:
