@@ -194,7 +194,6 @@ def render_buyback_section(data: CompanyAuditInput, result: AuditResult) -> None
     if data.amount_unit == "absolute":
         audit_display_df["dividends_paid_market_currency"] *= 1e6
         audit_display_df["buybacks_paid_market_currency"] *= 1e6
-        audit_display_df["buybacks_shares"] *= 1e6
 
     col_total_div = t("section.buyback.col.total_dividends", currency=data.market_currency)
     col_buyback_paid = t("section.buyback.col.buyback_paid", currency=data.market_currency)
@@ -465,9 +464,8 @@ def render_selected_section(section: str, data: CompanyAuditInput, params: Audit
             "net_profit", "ebit", "interest_expense", "total_equity",
             "short_term_debt", "long_term_debt", "cash_and_equivalents",
             "operating_cash_flow", "capex", "da", "dividends_paid",
-            "buybacks_paid", "ma_paid", "goodwill", "shares_outstanding",
-            "avg_stock_price", "closing_stock_price",
-            "buybacks_shares", "Market_Cap", "Owner_Earnings",
+            "buybacks_paid", "ma_paid", "goodwill",
+            "Market_Cap", "Owner_Earnings",
             "maintenance_capex", "total_debt", "Invested_Capital",
             "Retained_Earnings_Annual", "FCF"
         ]

@@ -75,10 +75,10 @@ def render_report_export_button(
 
     button_key = "build_report_btn"
     if st.sidebar.button(t("sidebar.report_export_button"), key=button_key):
+        from services.report import build_report, build_report_html
+
         try:
             with st.spinner(t("sidebar.report_export_building")):
-                from report import build_report, build_report_html
-
                 if fmt == "pdf":
                     payload = build_report(data, params, result)
                 else:
