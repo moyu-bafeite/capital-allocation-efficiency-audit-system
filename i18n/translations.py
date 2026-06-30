@@ -383,8 +383,8 @@ TRANSLATIONS = {
         "en": "A. **ROIC (Return on Invested Capital)**: Measures the current operational efficiency of invested capital."
     },
     "section.roic.intro.bullet2": {
-        "zh": "2、**ROIIC Retained（留存再投资回报率）**：$\\Delta NOPAT / 累计留存盈余$。衡量管理层扣留盈利后，再投资的效率。",
-        "en": "B. **ROIIC Retained (Incremental Return on Retained Earnings)**: $\\Delta NOPAT / Cumulative Retained Earnings$. Measures how efficiently management reinvests retained profits."
+        "zh": "2、**ROIIC Retained（留存再投资回报率）**：ΔNOPAT / 累计留存盈余。衡量管理层扣留盈利后，再投资的效率。",
+        "en": "B. **ROIIC Retained (Incremental Return on Retained Earnings)**: ΔNOPAT / Cumulative Retained Earnings. Measures how efficiently management reinvests retained profits."
     },
     "section.roic.guidance.header": {
         "zh": "**指引**",
@@ -473,8 +473,8 @@ TRANSLATIONS = {
         "en": "A. **Goodwill / Equity**: A rising ratio means the balance sheet is increasingly dependent on acquisition premiums. Impairment risk is accumulating."
     },
     "section.ma.intro.bullet2": {
-        "zh": "2、**Acquisition ROIIC**：$\\Delta NOPAT / 累计并购支出$。衡量并购资本是否赚回资本成本，低于 WACC 即为价值毁灭。",
-        "en": "B. **Acquisition ROIIC**: $\\Delta NOPAT / Cumulative M&A Spend$. Measures whether acquisition capital earns its cost of capital. Below WACC = value destruction."
+        "zh": "2、**Acquisition ROIIC**：ΔNOPAT / 累计并购支出。衡量并购资本是否赚回资本成本，低于 WACC 即为价值毁灭。",
+        "en": "B. **Acquisition ROIIC**: ΔNOPAT / Cumulative M&A Spend. Measures whether acquisition capital earns its cost of capital. Below WACC = value destruction."
     },
     "section.ma.intro.bullet3": {
         "zh": "3、**商誉增速 vs NOPAT 增速**：正值代表商誉膨胀快于利润增厚，并购未转化为真实盈利。",

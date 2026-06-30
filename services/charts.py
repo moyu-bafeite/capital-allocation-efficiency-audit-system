@@ -214,6 +214,7 @@ def create_buyback_chart(display_df, market_currency: str) -> go.Figure:
         plot_bgcolor="rgba(0,0,0,0)",
         font=dict(family="Courier Prime"),
         height=500,
+        legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="center", x=0.5),
     )
     return fig
 
