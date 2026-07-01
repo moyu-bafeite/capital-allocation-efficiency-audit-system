@@ -11,10 +11,9 @@ Two CSS variants share the same Jinja template:
 
 Both variants use IBM Plex Serif (Latin) + Noto Serif TC (Traditional
 Chinese) with flat 1px borders, no shadows, and hairline greys. Latin fonts
-are embedded via ``@font-face`` (local files for PDF, base64 for HTML); CJK
-is embedded for PDF (WeasyPrint subsets) and uses system serif TC fallback
-for HTML (Songti TC on macOS, PMingLiU on Windows, Noto Serif CJK TC on
-Linux).
+are embedded via ``@font-face`` (OTF files for PDF — WeasyPrint only embeds
+CFF/OTF fonts, not TTF; base64 for HTML); CJK is embedded for PDF (WeasyPrint
+subsets) and uses system serif TC fallback for HTML.
 """
 
 from __future__ import annotations
@@ -27,9 +26,7 @@ from jinja2 import Template
 
 _BASE_CSS = """
 html, body {
-    font-family: "IBM Plex Serif", "Noto Serif CJK TC",
-                 "Songti TC", "PMingLiU", "Noto Serif TC",
-                 serif;
+    font-family: "IBM Plex Serif", "Noto Serif CJK TC", serif;
     color: #1a1a1a;
     line-height: 1.55;
     margin: 0;

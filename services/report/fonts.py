@@ -32,8 +32,7 @@ FONT_FAMILY_STACK = (
 )
 
 SERIF_FONT_FAMILY_STACK = (
-    "'IBM Plex Serif', 'Noto Serif CJK TC', "
-    "'Songti TC', 'PMingLiU', 'Noto Serif TC', serif"
+    "'IBM Plex Serif', 'Noto Serif CJK TC', serif"
 )
 
 _LATIN_FONTS = [
@@ -44,10 +43,10 @@ _LATIN_FONTS = [
 ]
 
 _SERIF_LATIN_FONTS = [
-    ("IBM Plex Serif", 400, "normal", "IBMPlexSerif-Regular.ttf"),
-    ("IBM Plex Serif", 500, "normal", "IBMPlexSerif-Medium.ttf"),
-    ("IBM Plex Serif", 600, "normal", "IBMPlexSerif-SemiBold.ttf"),
-    ("IBM Plex Serif", 700, "normal", "IBMPlexSerif-Bold.ttf"),
+    ("IBM Plex Serif", 400, "normal", "IBMPlexSerif-Regular.otf", "opentype"),
+    ("IBM Plex Serif", 500, "normal", "IBMPlexSerif-Medium.otf", "opentype"),
+    ("IBM Plex Serif", 600, "normal", "IBMPlexSerif-SemiBold.otf", "opentype"),
+    ("IBM Plex Serif", 700, "normal", "IBMPlexSerif-Bold.otf", "opentype"),
 ]
 
 _SERIF_CJK_FONTS = [
@@ -111,21 +110,12 @@ def get_pdf_serif_font_face_css() -> str:
     """Return serif ``@font-face`` CSS with local file paths for WeasyPrint.
 
     Embeds both Latin (IBM Plex Serif, 4 weights) and CJK (Noto Serif TC,
-    3 weights) via local files. WeasyPrint subsets fonts, so only used
-    glyphs are embedded — typical PDF adds ~200-400 KB for CJK.
+    3 weights) via local OTF files. WeasyPrint embeds CFF/OTF fonts as
+    CIDFontType0 with FontFile3; TrueType (TTF) fonts are NOT embedded by
+    WeasyPrint, so OTF format is required for cross-platform PDF fidelity.
     """
     rules = []
-    for family, weight, style, filename in _SERIF_LATIN_FONTS:
-        rel_path = f"assets/fonts/{filename}"
-        rules.append(
-            f'@font-face {{\n'
-            f'  font-family: "{family}";\n'
-            f'  font-weight: {weight};\n'
-            f'  font-style: {style};\n'
-            f'  src: url("{rel_path}") format("truetype");\n'
-            f'}}'
-        )
-    for family, weight, style, filename, fmt in _SERIF_CJK_FONTS:
+    for family, weight, style, filename, fmt in _SERIF_LATIN_FONTS + _SERIF_CJK_FONTS:
         rel_path = f"assets/fonts/{filename}"
         rules.append(
             f'@font-face {{\n'
@@ -148,7 +138,7 @@ def get_html_serif_font_face_css() -> str:
     Noto Serif CJK TC on Linux).
     """
     rules = []
-    for family, weight, style, filename in _SERIF_LATIN_FONTS:
+    for family, weight, style, filename, fmt in _SERIF_LATIN_FONTS:
         font_path = _FONTS_DIR / filename
         if not font_path.exists():
             continue
@@ -159,7 +149,7 @@ def get_html_serif_font_face_css() -> str:
             f'  font-family: "{family}";\n'
             f'  font-weight: {weight};\n'
             f'  font-style: {style};\n'
-            f'  src: url(data:font/truetype;base64,{b64}) format("truetype");\n'
+            f'  src: url(data:font/opentype;base64,{b64}) format("{fmt}");\n'
             f'}}'
         )
     return "\n".join(rules)

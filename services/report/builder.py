@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, List
 
 from i18n import LANGUAGE_LABELS, get_lang, resolve, t
@@ -44,6 +45,8 @@ from services.report.sections import (
     _scale_absolute_to_million,
 )
 from services.report.template import render_html
+
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 logger = logging.getLogger(__name__)
 
@@ -231,7 +234,7 @@ def build_report(
     context = _build_context(data, params, result, sections)
     context["font_face"] = get_pdf_serif_font_face_css()
     html = render_html(context, mode="print")
-    pdf_bytes = HTML(string=html, base_url=".").write_pdf()
+    pdf_bytes = HTML(string=html, base_url=str(_PROJECT_ROOT)).write_pdf()
     return pdf_bytes
 
 

@@ -1,6 +1,6 @@
 LANGUAGES = ["en", "zh"]
 DEFAULT_LANG = "en"
-LANGUAGE_LABELS = {"zh": "中文", "en": "English"}
+LANGUAGE_LABELS = {"zh": "繁體中文", "en": "English"}
 
 
 class Translatable:
