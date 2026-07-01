@@ -9,9 +9,12 @@ Two CSS variants share the same Jinja template:
   as live Plotly ``<div>`` blocks with the Plotly.js library inlined once in
   ``<head>`` (~4.6 MB, offline-capable).
 
-Both variants mirror the "old-money" Courier Prime aesthetic from ``app.py``:
-flat 1px borders, no shadows, hairline greys, monospace numerals. CJK text
-falls back to system fonts (Hiragino Sans GB on macOS, Noto Sans CJK on Linux).
+Both variants use IBM Plex Serif (Latin) + Noto Serif TC (Traditional
+Chinese) with flat 1px borders, no shadows, and hairline greys. Latin fonts
+are embedded via ``@font-face`` (local files for PDF, base64 for HTML); CJK
+is embedded for PDF (WeasyPrint subsets) and uses system serif TC fallback
+for HTML (Songti TC on macOS, PMingLiU on Windows, Noto Serif CJK TC on
+Linux).
 """
 
 from __future__ import annotations
@@ -24,8 +27,9 @@ from jinja2 import Template
 
 _BASE_CSS = """
 html, body {
-    font-family: "Courier Prime", "Courier New", "Hiragino Sans GB",
-                 "Noto Sans CJK SC", "STHeiti", "PingFang SC", monospace;
+    font-family: "IBM Plex Serif", "Noto Serif CJK TC",
+                 "Songti TC", "PMingLiU", "Noto Serif TC",
+                 serif;
     color: #1a1a1a;
     line-height: 1.55;
     margin: 0;
@@ -311,7 +315,7 @@ PRINT_CSS = """
     margin: 1.5cm 1.5cm 1.5cm 1.5cm;
     @bottom-center {
         content: counter(page) " / " counter(pages);
-        font-family: "Courier Prime", "Courier New", monospace;
+        font-family: "IBM Plex Serif", "Noto Serif CJK TC", serif;
         font-size: 0.7rem;
         color: rgba(40, 40, 40, 0.5);
         padding-top: 6pt;
@@ -379,6 +383,7 @@ REPORT_TEMPLATE = Template(
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{ report_title }} - {{ company_name }}</title>
+{% if font_face %}<style>{{ font_face|safe }}</style>{% endif %}
 <style>{{ css }}</style>
 {% if plotly_js %}<script>{{ plotly_js }}</script>{% endif %}
 </head>
@@ -387,7 +392,6 @@ REPORT_TEMPLATE = Template(
 
 <!-- ════════════════════════ COVER ════════════════════════ -->
 <section class="cover">
-    <p class="eyebrow">{{ eyebrow }}</p>
     <h1>{{ report_title }}</h1>
     <p class="subtitle">{{ company_name }} · {{ ticker }}</p>
     <div class="ruler"></div>

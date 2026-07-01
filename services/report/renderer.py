@@ -22,7 +22,7 @@ import plotly.graph_objects as go
 
 logger = logging.getLogger(__name__)
 
-_PDF_FONT_FAMILY = "Courier Prime, Courier New, monospace"
+_PDF_FONT_FAMILY = "IBM Plex Serif, Noto Serif CJK TC, serif"
 
 
 def _has_right_axis_title(fig: go.Figure) -> bool:

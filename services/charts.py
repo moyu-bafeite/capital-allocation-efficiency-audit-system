@@ -68,7 +68,7 @@ def create_waterfall_chart(waterfall_data: dict, start_year: int, end_year: int)
         waterfallgap=0.3,
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(family="Courier Prime"),
+        font=dict(family="IBM Plex Sans, IBM Plex Sans TC, sans-serif"),
         height=500,
     )
     return fig
@@ -100,7 +100,7 @@ def create_allocation_pie_chart(waterfall_data: dict, currency: str) -> go.Figur
     fig.update_layout(
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(family="Courier Prime"),
+        font=dict(family="IBM Plex Sans, IBM Plex Sans TC, sans-serif"),
         height=350,
         margin=dict(t=10, b=10, l=10, r=10),
     )
@@ -163,7 +163,7 @@ def create_roic_chart(
         yaxis=dict(tickformat=".1%"),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(family="Courier Prime"),
+        font=dict(family="IBM Plex Sans, IBM Plex Sans TC, sans-serif"),
         height=500,
         legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="center", x=0.5),
     )
@@ -215,7 +215,7 @@ def create_buyback_chart(display_df, market_currency: str) -> go.Figure:
         xaxis=dict(tickmode="linear", tick0=min(display_df.index), dtick=1),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(family="Courier Prime"),
+        font=dict(family="IBM Plex Sans, IBM Plex Sans TC, sans-serif"),
         height=500,
         legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="center", x=0.5),
     )
@@ -290,7 +290,7 @@ def create_ma_goodwill_chart(
         xaxis=dict(tickmode="linear", tick0=min(plot_df.index), dtick=1),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(family="Courier Prime"),
+        font=dict(family="IBM Plex Sans, IBM Plex Sans TC, sans-serif"),
         height=500,
         legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5),
         barmode="group",
@@ -347,7 +347,7 @@ def create_earnings_quality_chart(audited_df) -> go.Figure:
         xaxis=dict(tickmode="linear", tick0=min(audited_df.index), dtick=1),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(family="Courier Prime"),
+        font=dict(family="IBM Plex Sans, IBM Plex Sans TC, sans-serif"),
         height=500,
         legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="center", x=0.5),
         barmode="group",

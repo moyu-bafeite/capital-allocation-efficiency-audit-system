@@ -22,6 +22,10 @@ from i18n import LANGUAGE_LABELS, get_lang, resolve, t
 from models.input_schema import CompanyAuditInput
 from services.audit_pipeline import AuditParams, AuditResult
 
+from services.report.fonts import (
+    get_html_serif_font_face_css,
+    get_pdf_serif_font_face_css,
+)
 from services.report.renderer import (
     get_plotlyjs_inline,
     kaleido_server,
@@ -187,6 +191,8 @@ def _build_context(
         },
         # Plotly.js is injected only by the HTML path; PDF path leaves this None
         "plotly_js": None,
+        # @font-face CSS is injected by both paths (local files for PDF, base64 for HTML)
+        "font_face": None,
     }
 
 
@@ -223,6 +229,7 @@ def build_report(
     _render_charts_for_pdf(sections)
 
     context = _build_context(data, params, result, sections)
+    context["font_face"] = get_pdf_serif_font_face_css()
     html = render_html(context, mode="print")
     pdf_bytes = HTML(string=html, base_url=".").write_pdf()
     return pdf_bytes
@@ -248,7 +255,7 @@ def build_report_html(
     _render_charts_for_html(sections)
 
     context = _build_context(data, params, result, sections)
-    # Inject Plotly.js once in <head> for all charts to share
+    context["font_face"] = get_html_serif_font_face_css()
     context["plotly_js"] = get_plotlyjs_inline()
     html = render_html(context, mode="screen")
     return html.encode("utf-8")

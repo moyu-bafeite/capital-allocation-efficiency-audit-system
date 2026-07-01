@@ -1,7 +1,7 @@
 """Page configuration and self-contained CSS.
 
-Font stack is consistent with the audit ``app.py`` (Courier Prime +
-Noto Sans SC, loaded from Google Fonts). Layout/sizing styles (flat
+Font stack is consistent with the audit ``app.py`` (IBM Plex Sans +
+IBM Plex Sans TC, locally embedded). Layout/sizing styles (flat
 borders, removed shadows) are kept lightweight and independent.
 """
 import os
@@ -9,6 +9,7 @@ import os
 import streamlit as st
 
 from hkex_app.i18n import t
+from services.report.fonts import get_html_font_face_css
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _DEFAULT_DB_PATH = os.path.join(_PROJECT_ROOT, ".cache", "audit.db")
@@ -29,23 +30,28 @@ def configure_page() -> None:
         page_icon=None,
     )
     st.markdown(
+        f"""
+        <style>
+            {get_html_font_face_css()}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown(
         """
         <style>
-            @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&display=swap');
-            @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400;1,700&family=Noto+Sans+SC:wght@100..900&display=swap');
-
-            /* Global styling for Courier Prime (matches app.py) */
+            /* Global styling for IBM Plex Sans (matches app.py) */
             html, body, [data-testid="stAppViewContainer"], .main, .sidebar {
-                font-family: 'Courier Prime', 'Noto Sans SC', monospace;
+                font-family: 'IBM Plex Sans', 'IBM Plex Sans TC', 'PingFang TC', 'Microsoft JhengHei', 'Noto Sans CJK TC', sans-serif;
             }
 
-            /* Apply Courier Prime to standard text and UI widgets */
+            /* Apply IBM Plex Sans to standard text and UI widgets */
             h1, h2, h3, h4, h5, h6, p, label, li, .stMetric, .stMarkdown, input, select, textarea, div[role="listbox"], ul[role="listbox"], li[role="option"], div[data-baseweb="popover"], div[data-baseweb="select"], div[data-baseweb="select"] span {
-                font-family: 'Courier Prime', 'Noto Sans SC', monospace !important;
+                font-family: 'IBM Plex Sans', 'IBM Plex Sans TC', 'PingFang TC', 'Microsoft JhengHei', 'Noto Sans CJK TC', sans-serif !important;
             }
 
             button {
-                font-family: 'Courier Prime', 'Noto Sans SC', monospace;
+                font-family: 'IBM Plex Sans', 'IBM Plex Sans TC', 'PingFang TC', 'Microsoft JhengHei', 'Noto Sans CJK TC', sans-serif;
             }
 
             /* Exempt icons from global font styling to ensure stSidebar collapse double arrow displays properly */

@@ -136,7 +136,7 @@ streamlit run hkex_app.py
 | 适用场景 | 屏幕浏览、邮件分享、内网托管 | 打印存档、正式提交 |
 | 离线可用 | 是（Plotly.js 内联） | 是 |
 
-报告使用与仪表盘一致的 Courier Prime "old-money" 排版风格，中英双语自动随当前界面语言切换。HTML 报告为零依赖路径，推荐优先使用；PDF 报告需额外安装系统库（见下方说明）。
+报告使用 IBM Plex Serif + Noto Serif TC（繁体中文）衬线排版，机构研报调性；仪表盘使用 IBM Plex Sans + IBM Plex Sans TC 无衬线排版。字体均本地嵌入（OFL 1.1 许可），中英双语自动随当前界面语言切换。HTML 报告为零依赖路径，推荐优先使用；PDF 报告需额外安装系统库（见下方说明）。
 
 ## 数据输入
 

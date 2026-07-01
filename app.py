@@ -2,6 +2,7 @@ import streamlit as st
 
 from i18n import t
 from services.audit_pipeline import run_audit
+from services.report.fonts import get_html_font_face_css
 from ui.sections import render_navigation, render_selected_section, render_summary
 from ui.sidebar import render_sidebar, render_report_export_button
 
@@ -14,23 +15,28 @@ def configure_page() -> None:
         page_icon=None,
     )
     st.markdown(
+        f"""
+        <style>
+            {get_html_font_face_css()}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown(
         """
         <style>
-            @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&display=swap');
-            @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400;1,700&family=Noto+Sans+SC:wght@100..900&display=swap');
-
-            /* Global styling for Courier Prime */
+            /* Global styling for IBM Plex Sans */
             html, body, [data-testid="stAppViewContainer"], .main, .sidebar {
-                font-family: 'Courier Prime', 'Noto Sans SC', monospace;
+                font-family: 'IBM Plex Sans', 'IBM Plex Sans TC', 'PingFang TC', 'Microsoft JhengHei', 'Noto Sans CJK TC', sans-serif;
             }
 
-            /* Apply Courier Prime to standard text and UI widgets */
+            /* Apply IBM Plex Sans to standard text and UI widgets */
             h1, h2, h3, h4, h5, h6, p, label, li, .stMetric, .stMarkdown, input, select, textarea, div[role="listbox"], ul[role="listbox"], li[role="option"], div[data-baseweb="popover"], div[data-baseweb="select"], div[data-baseweb="select"] span {
-                font-family: 'Courier Prime', 'Noto Sans SC', monospace !important;
+                font-family: 'IBM Plex Sans', 'IBM Plex Sans TC', 'PingFang TC', 'Microsoft JhengHei', 'Noto Sans CJK TC', sans-serif !important;
             }
 
             button {
-                font-family: 'Courier Prime', 'Noto Sans SC', monospace;
+                font-family: 'IBM Plex Sans', 'IBM Plex Sans TC', 'PingFang TC', 'Microsoft JhengHei', 'Noto Sans CJK TC', sans-serif;
             }
 
             /* Exempt icons from global font styling to ensure stSidebar collapse double arrow displays properly */
@@ -137,14 +143,14 @@ def configure_page() -> None:
                 border-radius: 0px !important;
             }
 
-            /* Old-money navigation caption: small uppercase tracked label */
+            /* Navigation caption: small uppercase tracked label */
             .nav-caption {
                 font-size: 0.7rem !important;
                 letter-spacing: 0.25em !important;
                 text-transform: uppercase !important;
                 opacity: 0.55;
                 margin: 0 0 0.35rem 0 !important;
-                font-family: 'Courier Prime', 'Noto Sans SC', monospace;
+                font-family: 'IBM Plex Sans', 'IBM Plex Sans TC', 'PingFang TC', 'Microsoft JhengHei', 'Noto Sans CJK TC', sans-serif;
             }
 
             /* Top navigation selectbox: compact, hairline border, transparent ground */
@@ -160,13 +166,13 @@ def configure_page() -> None:
                 color: rgba(128, 128, 128, 0.6) !important;
             }
 
-            /* Dropdown popover menu: flat, hairline, monospace, muted hover */
+            /* Dropdown popover menu: flat, hairline, muted hover */
             div[data-baseweb="popover"] ul[role="listbox"] {
                 border-radius: 0px !important;
                 border: 1px solid rgba(128, 128, 128, 0.3) !important;
                 background-color: var(--background-color, #ffffff) !important;
                 box-shadow: none !important;
-                font-family: 'Courier Prime', 'Noto Sans SC', monospace !important;
+                font-family: 'IBM Plex Sans', 'IBM Plex Sans TC', 'PingFang TC', 'Microsoft JhengHei', 'Noto Sans CJK TC', sans-serif !important;
             }
             div[data-baseweb="popover"] ul[role="listbox"] li {
                 border-radius: 0px !important;
