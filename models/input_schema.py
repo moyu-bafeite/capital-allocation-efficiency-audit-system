@@ -7,6 +7,7 @@ class FinancialsSchema(BaseModel):
     """
     net_profit: List[float] = Field(..., description="Net profit attributable to shareholders")
     ebit: List[float] = Field(..., description="EBIT (Earnings before interest and tax)")
+    revenue: Optional[List[float]] = Field(default=None, description="Operating revenue (used for WC Ratio maintenance-ΔWC estimation)")
     tax_rate: List[float] = Field(..., description="Effective tax rate (e.g. 0.18)")
     interest_expense: List[float] = Field(..., description="Interest expense on debt")
     total_equity: List[float] = Field(..., description="Total shareholder equity")
@@ -17,7 +18,15 @@ class FinancialsSchema(BaseModel):
     convertible_bonds: Optional[List[float]] = Field(default=None, description="Convertible notes and bonds (interest-bearing), non-negative")
     notes_payable: Optional[List[float]] = Field(default=None, description="Notes payable / short-term paper (interest-bearing), non-negative")
     cash_and_equivalents: List[float] = Field(..., description="Cash and equivalents / liquid investments")
+    # Working-capital balance-sheet components (for WC Ratio maintenance-ΔWC).
+    accounts_receivable: Optional[List[float]] = Field(default=None, description="Accounts receivable (balance sheet, non-negative)")
+    inventory: Optional[List[float]] = Field(default=None, description="Inventory (balance sheet, non-negative)")
+    accounts_payable: Optional[List[float]] = Field(default=None, description="Accounts payable (balance sheet, non-negative)")
     operating_cash_flow: List[float] = Field(..., description="Net cash flow from operating activities")
+    # Cash-flow-statement sub-totals used to derive the actual ΔWC and as the
+    # pre-tax base for Owner Earnings (Buffett-style, tax-adjusted).
+    operating_income_before_wc_change: Optional[List[float]] = Field(default=None, description="Operating income before the change of operating capital (cash flow statement sub-total, pre-tax)")
+    cash_from_business_operations: Optional[List[float]] = Field(default=None, description="Cash from business operations (cash flow statement sub-total, post-ΔWC)")
     capex: List[float] = Field(..., description="Capital expenditures")
     da: List[float] = Field(..., description="Depreciation and amortization")
     dividends_paid: List[float] = Field(..., description="Dividends paid to shareholders")
@@ -28,11 +37,13 @@ class FinancialsSchema(BaseModel):
     shares_outstanding: List[float] = Field(..., description="Absolute number of outstanding shares (year-end, excl. treasury)")
     avg_stock_price: List[float] = Field(..., description="Average annual stock price, in market_currency per share")
     closing_stock_price: Optional[List[float]] = Field(default=None, description="Closing stock price at the year's last trading day, in market_currency per share. Used for period-end market cap. Falls back to avg_stock_price when absent (e.g. legacy cached data).")
-    # Cash-flow-statement non-cash adjustments (used for Owner Earnings). Sourced
-    # from the cash flow statement add-back section; sign convention matches the
-    # cash flow statement (positive = loss added back to net profit).
+    # Cash-flow-statement non-cash adjustments (sourced from the cash flow
+    # statement add-back section). Retained for ledger transparency; Owner
+    # Earnings is now derived from operating_income_before_wc_change (which
+    # already embeds these add-backs). Sign convention: positive = loss added
+    # back to net profit, negative = gain deducted.
     cashflow_impairment_adjustment: Optional[List[float]] = Field(default=None, description="Impairment & provisions add-back from cash flow statement (positive for loss, abs-normalized)")
-    cashflow_fair_value_adjustment: Optional[List[float]] = Field(default=None, description="Fair value / revaluation surplus add-back from cash flow statement (positive = gain, negative = loss)")
+    cashflow_fair_value_adjustment: Optional[List[float]] = Field(default=None, description="Fair value / revaluation surplus add-back from cash flow statement (positive = loss add-back, negative = gain deduction)")
     # Income-statement items used to normalize NOPAT. Sourced from the income
     # statement (within Operating Profit). Sign: fair value positive = gain;
     # impairment abs-normalized (positive = loss).
@@ -72,6 +83,12 @@ class CompanyAuditInput(BaseModel):
         
         # Initialize optional financials lists if they are None to maintain backwards-compatibility
         optional_fields = [
+            "revenue",
+            "accounts_receivable",
+            "inventory",
+            "accounts_payable",
+            "operating_income_before_wc_change",
+            "cash_from_business_operations",
             "lease_liability_current",
             "lease_liability_non_current",
             "convertible_bonds",
@@ -155,6 +172,9 @@ class CompanyAuditInput(BaseModel):
             "convertible_bonds",
             "notes_payable",
             "cash_and_equivalents",
+            "accounts_receivable",
+            "inventory",
+            "accounts_payable",
             "capex",
             "da",
             "dividends_paid",

@@ -59,6 +59,10 @@ class FinancialCalculator:
         # IFRS 16 lease liabilities and other interest-bearing debt (convertible
         # bonds, notes payable) are added back like traditional debt so that the
         # RoU / financed assets remain in the capital base.
+        # NOTE: derivative financial assets are excluded from the liquid-cash
+        # deduction because they are typically operating hedges (FX / rates /
+        # commodity), not excess cash. Deducting them would understate IC and
+        # overstate ROIC.
         total_debt = self.df["short_term_debt"] + self.df["long_term_debt"]
         self.df["total_debt"] = total_debt
         total_lease_liability = (
@@ -79,8 +83,6 @@ class FinancialCalculator:
             + self.df["long_term_investment"]
             + self.df["fair_value_financial_assets_current"]
             + self.df["fair_value_financial_assets_non_current"]
-            + self.df["derivative_financial_assets_current"]
-            + self.df["derivative_financial_assets_non_current"]
             + self.df["available_for_sale_financial_assets_current"]
             + self.df["available_for_sale_financial_assets_non_current"]
         )
@@ -105,21 +107,63 @@ class FinancialCalculator:
             )
         )
 
-        # 4. Owner Earnings
-        # Owner Earnings = Net Profit + D&A + Cash-Flow Impairment Add-Back
-        #                  - Cash-Flow Fair-Value Adjustment - Maintenance CapEx
-        # Non-cash adjustments are sourced from the cash flow statement
-        # (cashflow_*), which reflects the add-back section used to reconcile
-        # net profit to operating cash flow.
+        # 4. Owner Earnings (Buffett-style, tax-adjusted)
+        # OE = (OpIncBeforeWC - maintenance_capex - maintenance_ΔWC) × (1 - tax)
+        #
+        # OpIncBeforeWC is the cash-flow-statement sub-total "Operating Income
+        # before the Change of Operating Capital" — i.e. pre-tax operating cash
+        # flow after all non-cash add-backs but BEFORE working-capital movement.
+        # It already embeds D&A, impairment, fair-value and other non-cash
+        # adjustments, so we don't re-add them.
+        #
+        # maintenance_ΔWC is estimated via the WC-Ratio method:
+        #   WC = AR + Inventory - AccountsPayable
+        #   WC_Ratio = WC / Revenue  (stable company-level efficiency)
+        #   maintenance_ΔWC = avg(WC_Ratio, 3Y) × ΔRevenue
+        # This ties the working-capital drain to revenue growth rather than
+        # using the volatile single-year actual ΔWC. Negative-WC businesses
+        # (e.g. Tencent, where payables > receivables) naturally release cash
+        # as they grow, which the formula captures correctly.
         maintenance_capex = self.df["capex"] * self.maintenance_capex_ratio
         self.df["maintenance_capex"] = maintenance_capex
-        self.df["Owner_Earnings"] = (
-            self.df["net_profit"]
-            + self.df["da"]
-            + self.df["cashflow_impairment_adjustment"]
-            - self.df["cashflow_fair_value_adjustment"]
-            - maintenance_capex
+
+        working_capital = (
+            self.df["accounts_receivable"]
+            + self.df["inventory"]
+            - self.df["accounts_payable"]
         )
+        self.df["working_capital"] = working_capital
+        wc_ratio = np.where(
+            self.df["revenue"] > 0,
+            working_capital / self.df["revenue"],
+            0.0,
+        )
+        self.df["wc_ratio"] = wc_ratio
+        # 3-year rolling average smooths year-to-year noise in the ratio.
+        avg_wc_ratio = (
+            pd.Series(wc_ratio, index=self.df.index)
+            .rolling(3, min_periods=1)
+            .mean()
+        )
+        self.df["avg_wc_ratio"] = avg_wc_ratio
+        delta_revenue = self.df["revenue"].diff().fillna(0.0)
+        self.df["delta_revenue"] = delta_revenue
+        maintenance_delta_wc = avg_wc_ratio * delta_revenue
+        self.df["maintenance_delta_wc"] = maintenance_delta_wc
+
+        # Actual ΔWC (for transparency / ledger display) derived from the two
+        # cash-flow sub-totals: CashFromBiz - OpIncBeforeWC = net WC movement.
+        self.df["delta_working_capital"] = (
+            self.df["cash_from_business_operations"]
+            - self.df["operating_income_before_wc_change"]
+        )
+
+        pre_tax_owner_earnings = (
+            self.df["operating_income_before_wc_change"]
+            - maintenance_capex
+            - maintenance_delta_wc
+        )
+        self.df["Owner_Earnings"] = pre_tax_owner_earnings * (1 - self.df["tax_rate"])
 
         # 5. Market Capitalization (period-end basis).
         # Period-end market cap = year-end shares × year-end closing price ×

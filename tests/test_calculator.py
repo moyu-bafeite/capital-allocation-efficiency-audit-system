@@ -46,7 +46,10 @@ class FinancialCalculatorTest(unittest.TestCase):
 
         self.assertEqual(df.loc[2020, "NOPAT"], 96)
         self.assertEqual(df.loc[2020, "Invested_Capital"], 600)
-        self.assertEqual(df.loc[2020, "Owner_Earnings"], 100)
+        # Owner Earnings now derives from OpIncBeforeWC (default 0 when not
+        # provided) minus maintenance capex, tax-adjusted:
+        # (0 - 20 - 0) * (1 - 0.2) = -16
+        self.assertEqual(df.loc[2020, "Owner_Earnings"], -16)
         # Period-end market cap = shares × closing_price × closing_FX.
         # 100M shares × 10.5 close × 1.0 FX = 1.05B; in millions → 1050.
         self.assertEqual(df.loc[2020, "Market_Cap"], 1050)
@@ -82,23 +85,25 @@ class FinancialCalculatorTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             FinancialCalculator(make_sample_input(), maintenance_capex_ratio=1.5)
 
-    def test_owner_earnings_with_non_cash_adjustments(self):
+    def test_owner_earnings_uses_opinc_before_wc_with_tax(self):
+        """Owner Earnings = (OpIncBeforeWC - maint_capex - maintenance_ΔWC) × (1-tax).
+        OpIncBeforeWC already embeds non-cash add-backs (D&A, impairment, fair
+        value), so we feed it directly rather than reconstructing from pieces.
+        """
         sample_input = make_sample_input()
-        # Set non-cash adjustments for 2020 (index 0) and 2021 (index 1).
-        # These are cash-flow-statement add-back items.
-        sample_input.financials.cashflow_impairment_adjustment = [15.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-        sample_input.financials.cashflow_fair_value_adjustment = [-10.0, 30.0, 0.0, 0.0, 0.0, 0.0]
+        # Provide OpIncBeforeWC so OE is driven by it.
+        # 2020: OpIncBeforeWC=150, maint_capex=20, ΔWC=0 (no revenue/WC fields)
+        # -> pre_tax_OE = 150 - 20 - 0 = 130 -> OE = 130 * 0.8 = 104
+        # 2021: OpIncBeforeWC=170, maint_capex=20, ΔWC=0
+        # -> pre_tax_OE = 170 - 20 - 0 = 150 -> OE = 150 * 0.8 = 120
+        sample_input.financials.operating_income_before_wc_change = [150.0, 170.0, 0.0, 0.0, 0.0, 0.0]
+        sample_input.financials.cash_from_business_operations = [150.0, 170.0, 0.0, 0.0, 0.0, 0.0]
 
         calculator = FinancialCalculator(sample_input, maintenance_capex_ratio=0.5)
         df = calculator.df
 
-        # 2020: net_profit(100) + da(20) + cashflow_impairment(15) - cashflow_fair_value(-10) - maintenance_capex(20)
-        # = 100 + 20 + 15 - (-10) - 20 = 125.0
-        self.assertEqual(df.loc[2020, "Owner_Earnings"], 125.0)
-
-        # 2021: net_profit(120) + da(20) + cashflow_impairment(0) - cashflow_fair_value(30) - maintenance_capex(20)
-        # = 120 + 20 + 0 - 30 - 20 = 90.0
-        self.assertEqual(df.loc[2021, "Owner_Earnings"], 90.0)
+        self.assertEqual(df.loc[2020, "Owner_Earnings"], 104.0)
+        self.assertEqual(df.loc[2021, "Owner_Earnings"], 120.0)
 
     def test_goodwill_and_ma_ratios(self):
         calculator = FinancialCalculator(make_sample_input(), maintenance_capex_ratio=0.5)
@@ -116,12 +121,13 @@ class FinancialCalculatorTest(unittest.TestCase):
         # 2020: OCF=130, capex=40 -> FCF=90; net_profit=100 -> FCF/NI=0.9
         self.assertEqual(df.loc[2020, "FCF"], 90)
         self.assertAlmostEqual(df.loc[2020, "FCF_to_NetIncome"], 90 / 100)
-        # Owner_Earnings 2020 = 100 + 20 - 20 = 100; OE/NI = 1.0
-        self.assertAlmostEqual(df.loc[2020, "OE_to_NetProfit"], 100 / 100)
+        # Owner_Earnings 2020 = (OpIncBeforeWC(0) - maint_capex(20) - 0) * 0.8 = -16
+        # OE/NI = -16 / 100
+        self.assertAlmostEqual(df.loc[2020, "OE_to_NetProfit"], -16 / 100)
         # Accruals = (net_profit - OCF) / IC = (100 - 130) / 600 = -30/600
         self.assertAlmostEqual(df.loc[2020, "Accruals_Ratio"], (100 - 130) / 600)
-        # OEPS = Owner_Earnings / shares_in_millions = 100 / 100 = 1.0
-        self.assertAlmostEqual(df.loc[2020, "OEPS"], 100 / 100)
+        # OEPS = Owner_Earnings / shares_in_millions = -16 / 100
+        self.assertAlmostEqual(df.loc[2020, "OEPS"], -16 / 100)
 
     def test_acquisition_roiic_in_processed_df(self):
         calculator = FinancialCalculator(make_sample_input(), maintenance_capex_ratio=0.5)
@@ -234,6 +240,49 @@ class FinancialCalculatorTest(unittest.TestCase):
         calculator = FinancialCalculator(sample, maintenance_capex_ratio=0.5)
         df = calculator.df
         self.assertEqual(df.loc[2020, "NOPAT"], 116.0)
+
+    def test_derivative_assets_not_deducted_from_invested_capital(self):
+        """Derivative financial assets are operating hedges, not excess cash.
+        They must NOT be deducted from the liquid-cash pool when computing
+        Invested Capital, otherwise IC is understated and ROIC overstated."""
+        sample = make_sample_input()
+        # Base IC 2020 = equity(500) + debt(150) - cash(50) = 600
+        # Derivatives should NOT reduce IC.
+        sample.financials.derivative_financial_assets_current = [30.0] * 6
+        sample.financials.derivative_financial_assets_non_current = [70.0] * 6
+        calculator = FinancialCalculator(sample, maintenance_capex_ratio=0.5)
+        df = calculator.df
+        # IC stays 600 — the 100 of derivatives is not subtracted.
+        self.assertEqual(df.loc[2020, "Invested_Capital"], 600.0)
+
+    def test_working_capital_ratio_reduces_owner_earnings(self):
+        """maintenance_ΔWC = avg(WC_Ratio, 3Y) × ΔRevenue must be deducted
+        from pre-tax Owner Earnings. A positive-WC company growing revenue
+        consumes working capital, lowering OE."""
+        sample = make_sample_input()
+        # Set up a positive-WC company: WC = AR(40) + Inv(20) - AP(10) = 50
+        # Revenue 2020=1000, 2021=1100 -> ΔRev = +100
+        # WC_Ratio = 50/1000 = 0.05; avg (first year, min_periods=1) = 0.05
+        # maintenance_ΔWC = 0.05 * 100 = 5
+        # OpIncBeforeWC 2021 = 200, maint_capex = 20
+        # pre_tax_OE = 200 - 20 - 5 = 175 -> OE = 175 * 0.8 = 140
+        sample.financials.revenue = [1000.0, 1100.0, 0.0, 0.0, 0.0, 0.0]
+        sample.financials.accounts_receivable = [40.0, 44.0, 0.0, 0.0, 0.0, 0.0]
+        sample.financials.inventory = [20.0, 22.0, 0.0, 0.0, 0.0, 0.0]
+        sample.financials.accounts_payable = [10.0, 11.0, 0.0, 0.0, 0.0, 0.0]
+        sample.financials.operating_income_before_wc_change = [0.0, 200.0, 0.0, 0.0, 0.0, 0.0]
+        sample.financials.cash_from_business_operations = [0.0, 195.0, 0.0, 0.0, 0.0, 0.0]
+        calculator = FinancialCalculator(sample, maintenance_capex_ratio=0.5)
+        df = calculator.df
+        # 2021: AR=44, Inv=22, AP=11 -> WC=55; WC_Ratio=55/1100=0.05
+        # avg_wc_ratio (min_periods=1 at 2021 is 2-year avg since 2020 has data)
+        # 2020 wc_ratio = 50/1000 = 0.05; 2021 = 0.05 -> avg = 0.05
+        # delta_revenue 2021 = 1100-1000 = 100
+        # maintenance_delta_wc = 0.05 * 100 = 5
+        # OE = (200 - 20 - 5) * 0.8 = 140
+        self.assertAlmostEqual(df.loc[2021, "wc_ratio"], 0.05)
+        self.assertAlmostEqual(df.loc[2021, "maintenance_delta_wc"], 5.0)
+        self.assertAlmostEqual(df.loc[2021, "Owner_Earnings"], 140.0)
 
     def test_negative_invested_capital_yields_infinite_roic(self):
         sample = make_sample_input()

@@ -41,6 +41,12 @@ class InputSchemaTest(unittest.TestCase):
         self.assertEqual(data.financials.operating_interest_expense, [0.0] * len(data.years))
         self.assertEqual(data.financials.share_of_profit_associates, [0.0] * len(data.years))
         self.assertEqual(data.financials.share_of_profit_joint_venture, [0.0] * len(data.years))
+        self.assertEqual(data.financials.revenue, [0.0] * len(data.years))
+        self.assertEqual(data.financials.accounts_receivable, [0.0] * len(data.years))
+        self.assertEqual(data.financials.inventory, [0.0] * len(data.years))
+        self.assertEqual(data.financials.accounts_payable, [0.0] * len(data.years))
+        self.assertEqual(data.financials.operating_income_before_wc_change, [0.0] * len(data.years))
+        self.assertEqual(data.financials.cash_from_business_operations, [0.0] * len(data.years))
 
 
 if __name__ == "__main__":

@@ -25,6 +25,9 @@ def normalize_audit_data(raw_data: Dict[str, Any]) -> Dict[str, Any]:
         "convertible_bonds",
         "notes_payable",
         "cash_and_equivalents",
+        "accounts_receivable",
+        "inventory",
+        "accounts_payable",
         "capex",
         "da",
         "dividends_paid",
@@ -92,6 +95,12 @@ def normalize_audit_data(raw_data: Dict[str, Any]) -> Dict[str, Any]:
 
     # 4. Fill key net_profit, ebit and optional non-cash adjustment lists
     optional_keys = [
+        "revenue",
+        "accounts_receivable",
+        "inventory",
+        "accounts_payable",
+        "operating_income_before_wc_change",
+        "cash_from_business_operations",
         "lease_liability_current",
         "lease_liability_non_current",
         "convertible_bonds",

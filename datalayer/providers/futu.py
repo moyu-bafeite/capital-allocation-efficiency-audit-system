@@ -193,6 +193,7 @@ class FutuOpenDProvider(BaseProvider):
             "net_profit": ["Net Income to Parent Company", "Net Income to Common Stockholders"],
             "eps": ["Basic EPS"],
             "ebit": ["Operating Profit"],
+            "revenue": ["Operating Revenue", "Total Revenue"],
             "special_items_of_operating_profit": ["Special Items of Operating Income"],
             "special_items_of_net_profit": ["Special Items of Pretax Income"],
             "interest_expense": ["Financing Cost"],
@@ -204,6 +205,10 @@ class FutuOpenDProvider(BaseProvider):
             "convertible_bonds": ["Convertible Notes and Bonds", "Convertible Bonds"],
             "notes_payable": ["Notes Payable"],
             "cash_and_equivalents": ["Cash and Equivalents"],
+            # Working-capital balance-sheet components (for WC Ratio).
+            "accounts_receivable": ["Accounts Receivable", "Trade Receivables"],
+            "inventory": ["Inventory", "Inventories"],
+            "accounts_payable": ["Accounts Payable", "Trade Payables"],
             "short_term_deposits": ["Short-Term Deposit"],
             "time_deposits_current": ["Fixed Deposit - Current Assets"],
             "time_deposits_non_current": ["Fixed Deposit - Non-Current Assets"],
@@ -216,6 +221,10 @@ class FutuOpenDProvider(BaseProvider):
             "available_for_sale_financial_assets_current": ["Available for Sale of Financial Assets - Current Assets"],
             "available_for_sale_financial_assets_non_current": ["Available for Sale of Financial Assets - Non-Current Assets"],
             "operating_cash_flow": ["Operating Cash Flow"],
+            # Cash-flow-statement sub-totals used to derive actual ΔWC and as
+            # the pre-tax base for Owner Earnings.
+            "operating_income_before_wc_change": ["Operating Income before the Change of Operating Capital"],
+            "cash_from_business_operations": ["Cash from Business Operations"],
             "capex": ["Purchase of Fixed Assets"],
             "da": ["Depreciation and Amortization:", "Depreciation and Amortization"],
             "dividends_paid": ["Dividends Paid - Financing"],
