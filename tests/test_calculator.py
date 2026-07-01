@@ -278,10 +278,10 @@ class FinancialCalculatorTest(unittest.TestCase):
         # avg_wc_ratio (min_periods=1 at 2021 is 2-year avg since 2020 has data)
         # 2020 wc_ratio = 50/1000 = 0.05; 2021 = 0.05 -> avg = 0.05
         # delta_revenue 2021 = 1100-1000 = 100
-        # maintenance_delta_wc = 0.05 * 100 = 5
+        # expansion_delta_wc = 0.05 * 100 = 5  (expansion, supports growth)
         # OE = (200 - 20 - 5) * 0.8 = 140
         self.assertAlmostEqual(df.loc[2021, "wc_ratio"], 0.05)
-        self.assertAlmostEqual(df.loc[2021, "maintenance_delta_wc"], 5.0)
+        self.assertAlmostEqual(df.loc[2021, "expansion_delta_wc"], 5.0)
         self.assertAlmostEqual(df.loc[2021, "Owner_Earnings"], 140.0)
 
     def test_negative_invested_capital_yields_infinite_roic(self):
