@@ -91,14 +91,15 @@ def normalize_audit_data(raw_data: Dict[str, Any]) -> Dict[str, Any]:
         "special_items_of_net_profit",
         "short_term_deposits",
         "time_deposits_current",
+        "time_deposits_non_current",
         "short_term_investment",
         "long_term_investment",
         "fair_value_financial_assets_current",
-        "derivative_financial_assets_current",
-        "available_for_sale_financial_assets_current",
         "fair_value_financial_assets_non_current",
+        "derivative_financial_assets_current",
         "derivative_financial_assets_non_current",
-        "time_deposits_non_current",
+        "available_for_sale_financial_assets_current",
+        "available_for_sale_financial_assets_non_current"
     ]
     for key in ["net_profit", "ebit"] + optional_keys:
         if key in financials:

@@ -186,35 +186,36 @@ class FutuOpenDProvider(BaseProvider):
         # We search itemList of each report
         # We define matches using standard Chinese display names found in Futu reports!
         item_definitions = {
-            "net_profit": ["归属普通股股东净利润", "归属母公司净利润"],
-            "eps": ["基本每股收益"],
-            "ebit": ["营业利润"],
-            "special_items_of_operating_profit": ["经营利润特殊项目"],
-            "special_items_of_net_profit": ["利润特殊项目"],
-            "interest_expense": ["融资成本", "财务成本"],
-            "total_equity": ["归属于母公司股东权益合计", "股东权益合计"],
-            "short_term_debt": ["短期借款", "银行贷款及透支"],
-            "long_term_debt": ["长期借款", "长期银行贷款"],
-            "cash_and_equivalents": ["现金及等价物"],
-            "short_term_deposits": ["短期存款", "短期存款-流动资产"],
-            "time_deposits_current": ["定期存款", "定期存款-流动资产"],
-            "short_term_investment": ["短期投资"],
-            "long_term_investment": ["长期投资"],
-            "fair_value_financial_assets_current": ["按公平值入损益金融资产-流动资产"],
-            "derivative_financial_assets_current": ["衍生金融工具-流动资产"],
-            "available_for_sale_financial_assets_current": ["可供出售金融资产-流动资产"],
-            "fair_value_financial_assets_non_current": ["按公平值入损益金融资产-非流动资产"],
-            "derivative_financial_assets_non_current": ["衍生金融工具-非流动资产"],
-            "time_deposits_non_current": ["定期存款-非流动资产"],
-            "operating_cash_flow": ["经营活动现金流量净额"],
-            "capex": ["购买固定资产", "资本开支", "资本支出", "购买物业、厂房及设备"],
-            "da": ["折旧及摊销:", "折旧及摊销", "折旧与摊销"],
-            "dividends_paid": ["已付股息-融资"],
+            "net_profit": ["归属普通股股东净利润", "归属母公司净利润", "Net Income to Parent Company", "Net Income to Common Stockholders"],
+            "eps": ["基本每股收益", "Basic EPS"],
+            "ebit": ["营业利润", "Operating Profit"],
+            "special_items_of_operating_profit": ["经营利润特殊项目", "Special Items of Operating Income"],
+            "special_items_of_net_profit": ["利润特殊项目", "Special Items of Pretax Income"],
+            "interest_expense": ["融资成本", "财务成本", "Financing Cost"],
+            "total_equity": ["归属于母公司股东权益合计", "股东权益合计", "Stockholders' Equity"],
+            "short_term_debt": ["银行贷款及透支", "Bank Loans and Overdrafts"],
+            "long_term_debt": ["长期银行贷款", "Long-Term Bank Loan"],
+            "cash_and_equivalents": ["现金及等价物", "Cash and Equivalents"],
+            "short_term_deposits": ["短期存款", "短期存款-流动资产", "Short-Term Deposit"],
+            "time_deposits_current": ["定期存款", "定期存款-流动资产", "Fixed Deposit - Current Assets"],
+            "time_deposits_non_current": ["定期存款-非流动资产", "Fixed Deposit - Non-Current Assets"],
+            "short_term_investment": ["短期投资", "Short-Term Investments"],
+            "long_term_investment": ["长期投资", "Long-Term Investments"],
+            "fair_value_financial_assets_current": ["按公平值入损益金融资产-流动资产", "Financial Assets at Fair Value-Non-Current Assets", "Financial Assets at Fair Value - Current Assets"],
+            "fair_value_financial_assets_non_current": ["按公平值入损益金融资产-非流动资产", "Financial Assets at Fair Value - Non-Current Assets"],
+            "derivative_financial_assets_current": ["衍生金融工具-流动资产", "Derivative Financial Instruments - Current Assets"],
+            "derivative_financial_assets_non_current": ["衍生金融工具-非流动资产", "Derivative Financial Instruments - Non-Current Assets"],
+            "available_for_sale_financial_assets_current": ["可供出售金融资产-流动资产", "Available for Sale of Financial Assets - Current Assets"],
+            "available_for_sale_financial_assets_non_current": ["可供出售金融资产-非流动资产", "Available for Sale of Financial Assets - Non-Current Assets"],
+            "operating_cash_flow": ["经营活动现金流量净额", "Operating Cash Flow"],
+            "capex": ["购买固定资产", "Purchase of Fixed Assets"],
+            "da": ["折旧及摊销:", "折旧及摊销", "Depreciation and Amortization:", "Depreciation and Amortization"],
+            "dividends_paid": ["已付股息-融资", "Dividends Paid - Financing"],
             "buybacks_paid": [],
-            "ma_paid": ["收购附属公司"],
-            "goodwill": ["商誉"],
-            "impairment_charges": ['减值与拨备'],
-            "fair_value_changes": ['公允价值变动'],
+            "ma_paid": ["收购附属公司", "Acquisition of Subsidiaries"],
+            "goodwill": ["商誉", "Goodwill"],
+            "impairment_charges": ['减值与拨备', '减值与拨备:', "Impairment and Provisions", "Impairment and Provisions:"],
+            "fair_value_changes": ['公允价值变动', "Revaluation Surplus:"],
             "shares_outstanding": []
         }
 
@@ -242,9 +243,9 @@ class FutuOpenDProvider(BaseProvider):
                 val = float(item.get("data", 0.0))
 
                 # Check tax parameters
-                if display_name == "税前利润":
+                if display_name in ["税前利润", "Pretax Profit"]:
                     pretax_profit = val
-                if display_name == "所得税":
+                if display_name in ["所得税", "Tax"]:
                     tax_expense = val
 
                 # Map matches

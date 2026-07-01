@@ -35,6 +35,7 @@ class FinancialsSchema(BaseModel):
     fair_value_financial_assets_current: Optional[List[float]] = Field(default=None, description="Fair value of financial assets (current)")
     derivative_financial_assets_current: Optional[List[float]] = Field(default=None, description="Derivative financial assets (current)")
     available_for_sale_financial_assets_current: Optional[List[float]] = Field(default=None, description="Available for sale financial assets (current)")
+    available_for_sale_financial_assets_non_current: Optional[List[float]] = Field(default=None, description="Available for sale financial assets (non-current)")
     fair_value_financial_assets_non_current: Optional[List[float]] = Field(default=None, description="Fair value of financial assets (non-current)")
     derivative_financial_assets_non_current: Optional[List[float]] = Field(default=None, description="Derivative financial assets (non-current)")
     time_deposits_non_current: Optional[List[float]] = Field(default=None, description="Time deposits (non-current)")
@@ -67,6 +68,7 @@ class CompanyAuditInput(BaseModel):
             "fair_value_financial_assets_current",
             "derivative_financial_assets_current",
             "available_for_sale_financial_assets_current",
+            "available_for_sale_financial_assets_non_current",
             "fair_value_financial_assets_non_current",
             "derivative_financial_assets_non_current",
             "time_deposits_non_current",

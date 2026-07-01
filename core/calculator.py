@@ -51,6 +51,7 @@ class FinancialCalculator:
             + self.df["derivative_financial_assets_current"]
             + self.df["derivative_financial_assets_non_current"]
             + self.df["available_for_sale_financial_assets_current"]
+            + self.df["available_for_sale_financial_assets_non_current"]
         )
         self.df["Invested_Capital"] = self.df["total_equity"] + total_debt - total_liquid_cash
 
