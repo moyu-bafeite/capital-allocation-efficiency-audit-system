@@ -84,18 +84,19 @@ class FinancialCalculatorTest(unittest.TestCase):
 
     def test_owner_earnings_with_non_cash_adjustments(self):
         sample_input = make_sample_input()
-        # Set non-cash adjustments for 2020 (index 0) and 2021 (index 1)
-        sample_input.financials.impairment_charges = [15.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-        sample_input.financials.fair_value_changes = [-10.0, 30.0, 0.0, 0.0, 0.0, 0.0]
+        # Set non-cash adjustments for 2020 (index 0) and 2021 (index 1).
+        # These are cash-flow-statement add-back items.
+        sample_input.financials.cashflow_impairment_adjustment = [15.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        sample_input.financials.cashflow_fair_value_adjustment = [-10.0, 30.0, 0.0, 0.0, 0.0, 0.0]
 
         calculator = FinancialCalculator(sample_input, maintenance_capex_ratio=0.5)
         df = calculator.df
 
-        # 2020: net_profit(100) + da(20) + impairment_charges(15) - fair_value_changes(-10) - maintenance_capex(20)
+        # 2020: net_profit(100) + da(20) + cashflow_impairment(15) - cashflow_fair_value(-10) - maintenance_capex(20)
         # = 100 + 20 + 15 - (-10) - 20 = 125.0
         self.assertEqual(df.loc[2020, "Owner_Earnings"], 125.0)
 
-        # 2021: net_profit(120) + da(20) + impairment_charges(0) - fair_value_changes(30) - maintenance_capex(20)
+        # 2021: net_profit(120) + da(20) + cashflow_impairment(0) - cashflow_fair_value(30) - maintenance_capex(20)
         # = 120 + 20 + 0 - 30 - 20 = 90.0
         self.assertEqual(df.loc[2021, "Owner_Earnings"], 90.0)
 
@@ -174,6 +175,65 @@ class FinancialCalculatorTest(unittest.TestCase):
         # NOPAT grows from 96 (2020) to 168 (2023), so nopat_diff = 72 > 0.
         # Expected value is np.inf
         self.assertEqual(df.loc[2023, "ROIIC_Retained_3Y"], np.inf)
+
+    def test_lease_and_other_debt_added_to_invested_capital(self):
+        """Lease liabilities, convertible bonds and notes payable must be
+        added to the debt side of Invested Capital (IFRS 16 + other
+        interest-bearing debt), increasing IC and lowering ROIC vs the
+        traditional debt-only base."""
+        sample = make_sample_input()
+        # Base IC (2020) = equity(500) + debt(150) - cash(50) = 600
+        # Add lease 60 + convertible 40 + notes 20 = +120 -> IC = 720
+        sample.financials.lease_liability_current = [20.0] * 6
+        sample.financials.lease_liability_non_current = [40.0] * 6
+        sample.financials.convertible_bonds = [40.0] * 6
+        sample.financials.notes_payable = [20.0] * 6
+        calculator = FinancialCalculator(sample, maintenance_capex_ratio=0.5)
+        df = calculator.df
+
+        self.assertEqual(df.loc[2020, "total_lease_liability"], 60.0)
+        self.assertEqual(df.loc[2020, "total_other_interest_bearing_debt"], 60.0)
+        self.assertEqual(df.loc[2020, "Invested_Capital"], 720.0)
+
+    def test_income_fair_value_and_impairment_excluded_from_nopat(self):
+        """Income-statement fair value changes (gain) must be subtracted from
+        EBIT and income-statement impairment (loss, abs-normalized) must be
+        added back when computing NOPAT, so non-operating / non-cash items
+        inside Operating Profit do not pollute operating profitability."""
+        sample = make_sample_input()
+        # 2020 baseline NOPAT = ebit(120) * (1 - 0.2) = 96
+        # Add a 30 fair-value gain (subtracted) and 50 impairment loss (added back):
+        # normalized OP = 120 - 30 + 50 = 140 -> NOPAT = 140 * 0.8 = 112
+        sample.financials.income_fair_value_changes = [30.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        sample.financials.income_impairment_charges = [50.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        calculator = FinancialCalculator(sample, maintenance_capex_ratio=0.5)
+        df = calculator.df
+        self.assertEqual(df.loc[2020, "NOPAT"], 112.0)
+
+    def test_associates_and_joint_venture_added_to_nopat(self):
+        """Share of profits of associates and joint ventures sits below
+        operating profit and is already post-tax, so it is added directly to
+        NOPAT (not grossed up by the tax rate)."""
+        sample = make_sample_input()
+        # Baseline NOPAT 2020 = 96. Add associates 24 + JV 16 = +40 -> 136
+        sample.financials.share_of_profit_associates = [24.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        sample.financials.share_of_profit_joint_venture = [16.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        calculator = FinancialCalculator(sample, maintenance_capex_ratio=0.5)
+        df = calculator.df
+        self.assertEqual(df.loc[2020, "NOPAT"], 136.0)
+
+    def test_operating_interest_expense_added_back_to_nopat(self):
+        """Issuers that deduct interest expense above Operating Profit (e.g.
+        CK Asset 01113) must have it added back so Operating Profit is
+        restored to a true EBIT before the tax shield is applied."""
+        sample = make_sample_input()
+        # Baseline NOPAT 2020 = 120 * 0.8 = 96.
+        # Add operating_interest_expense 25 -> normalized OP = 120 + 25 = 145
+        # -> NOPAT = 145 * 0.8 = 116
+        sample.financials.operating_interest_expense = [25.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        calculator = FinancialCalculator(sample, maintenance_capex_ratio=0.5)
+        df = calculator.df
+        self.assertEqual(df.loc[2020, "NOPAT"], 116.0)
 
     def test_negative_invested_capital_yields_infinite_roic(self):
         sample = make_sample_input()

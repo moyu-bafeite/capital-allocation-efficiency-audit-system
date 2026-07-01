@@ -182,40 +182,57 @@ class FutuOpenDProvider(BaseProvider):
         return ticker
 
     def _map_futu_reports(self, raw_reports: List[Dict[str, Any]], years: List[int]) -> Dict[str, List[float]]:
-        # Map Futu Field IDs (or typical display name substring match) to our schema
-        # We search itemList of each report
-        # We define matches using standard Chinese display names found in Futu reports!
+        # Map Futu display_name values to our schema. All keys are English;
+        # Futu OpenD returns English display names for HK-listed stocks.
+        # Note: some display names differ only by a trailing colon — the
+        # income-statement version has no colon (e.g. "Revaluation Surplus")
+        # while the cash-flow-statement version has a colon (e.g.
+        # "Revaluation Surplus:"). This is how we route values to the correct
+        # schema field (income_* vs cashflow_*).
         item_definitions = {
-            "net_profit": ["归属普通股股东净利润", "归属母公司净利润", "Net Income to Parent Company", "Net Income to Common Stockholders"],
-            "eps": ["基本每股收益", "Basic EPS"],
-            "ebit": ["营业利润", "Operating Profit"],
-            "special_items_of_operating_profit": ["经营利润特殊项目", "Special Items of Operating Income"],
-            "special_items_of_net_profit": ["利润特殊项目", "Special Items of Pretax Income"],
-            "interest_expense": ["融资成本", "财务成本", "Financing Cost"],
-            "total_equity": ["归属于母公司股东权益合计", "股东权益合计", "Stockholders' Equity"],
-            "short_term_debt": ["银行贷款及透支", "Bank Loans and Overdrafts"],
-            "long_term_debt": ["长期银行贷款", "Long-Term Bank Loan"],
-            "cash_and_equivalents": ["现金及等价物", "Cash and Equivalents"],
-            "short_term_deposits": ["短期存款", "短期存款-流动资产", "Short-Term Deposit"],
-            "time_deposits_current": ["定期存款", "定期存款-流动资产", "Fixed Deposit - Current Assets"],
-            "time_deposits_non_current": ["定期存款-非流动资产", "Fixed Deposit - Non-Current Assets"],
-            "short_term_investment": ["短期投资", "Short-Term Investments"],
-            "long_term_investment": ["长期投资", "Long-Term Investments"],
-            "fair_value_financial_assets_current": ["按公平值入损益金融资产-流动资产", "Financial Assets at Fair Value-Non-Current Assets", "Financial Assets at Fair Value - Current Assets"],
-            "fair_value_financial_assets_non_current": ["按公平值入损益金融资产-非流动资产", "Financial Assets at Fair Value - Non-Current Assets"],
-            "derivative_financial_assets_current": ["衍生金融工具-流动资产", "Derivative Financial Instruments - Current Assets"],
-            "derivative_financial_assets_non_current": ["衍生金融工具-非流动资产", "Derivative Financial Instruments - Non-Current Assets"],
-            "available_for_sale_financial_assets_current": ["可供出售金融资产-流动资产", "Available for Sale of Financial Assets - Current Assets"],
-            "available_for_sale_financial_assets_non_current": ["可供出售金融资产-非流动资产", "Available for Sale of Financial Assets - Non-Current Assets"],
-            "operating_cash_flow": ["经营活动现金流量净额", "Operating Cash Flow"],
-            "capex": ["购买固定资产", "Purchase of Fixed Assets"],
-            "da": ["折旧及摊销:", "折旧及摊销", "Depreciation and Amortization:", "Depreciation and Amortization"],
-            "dividends_paid": ["已付股息-融资", "Dividends Paid - Financing"],
+            "net_profit": ["Net Income to Parent Company", "Net Income to Common Stockholders"],
+            "eps": ["Basic EPS"],
+            "ebit": ["Operating Profit"],
+            "special_items_of_operating_profit": ["Special Items of Operating Income"],
+            "special_items_of_net_profit": ["Special Items of Pretax Income"],
+            "interest_expense": ["Financing Cost"],
+            "total_equity": ["Stockholders' Equity"],
+            "short_term_debt": ["Bank Loans and Overdrafts"],
+            "long_term_debt": ["Long-Term Bank Loan"],
+            "lease_liability_current": ["Financial Lease Liabilities-Current Liabilities", "Lease Liabilities - Current Liabilities"],
+            "lease_liability_non_current": ["Financial Lease Liabilities-Non-Current", "Lease Liabilities - Non-Current Liabilities", "Lease Liabilities - Non-Current"],
+            "convertible_bonds": ["Convertible Notes and Bonds", "Convertible Bonds"],
+            "notes_payable": ["Notes Payable"],
+            "cash_and_equivalents": ["Cash and Equivalents"],
+            "short_term_deposits": ["Short-Term Deposit"],
+            "time_deposits_current": ["Fixed Deposit - Current Assets"],
+            "time_deposits_non_current": ["Fixed Deposit - Non-Current Assets"],
+            "short_term_investment": ["Short-Term Investments"],
+            "long_term_investment": ["Long-Term Investments"],
+            "fair_value_financial_assets_current": ["Financial Assets at Fair Value - Current Assets"],
+            "fair_value_financial_assets_non_current": ["Financial Assets at Fair Value - Non-Current Assets"],
+            "derivative_financial_assets_current": ["Derivative Financial Instruments - Current Assets"],
+            "derivative_financial_assets_non_current": ["Derivative Financial Instruments - Non-Current Assets"],
+            "available_for_sale_financial_assets_current": ["Available for Sale of Financial Assets - Current Assets"],
+            "available_for_sale_financial_assets_non_current": ["Available for Sale of Financial Assets - Non-Current Assets"],
+            "operating_cash_flow": ["Operating Cash Flow"],
+            "capex": ["Purchase of Fixed Assets"],
+            "da": ["Depreciation and Amortization:", "Depreciation and Amortization"],
+            "dividends_paid": ["Dividends Paid - Financing"],
             "buybacks_paid": [],
-            "ma_paid": ["收购附属公司", "Acquisition of Subsidiaries"],
-            "goodwill": ["商誉", "Goodwill"],
-            "impairment_charges": ['减值与拨备', '减值与拨备:', "Impairment and Provisions", "Impairment and Provisions:"],
-            "fair_value_changes": ['公允价值变动', "Revaluation Surplus:"],
+            "ma_paid": ["Acquisition of Subsidiaries"],
+            "goodwill": ["Goodwill"],
+            # Cash-flow-statement non-cash adjustments (used for Owner Earnings).
+            # Trailing colon distinguishes cash-flow-statement rows from
+            # income-statement rows.
+            "cashflow_impairment_adjustment": ["Impairment and Provisions:"],
+            "cashflow_fair_value_adjustment": ["Revaluation Surplus:"],
+            # Income-statement items used to normalize NOPAT. No trailing colon.
+            "income_impairment_charges": ["Impairment and Provision", "Impairment and Provisions"],
+            "income_fair_value_changes": ["Revaluation Surplus"],
+            "operating_interest_expense": ["Operating Interest Expense"],
+            "share_of_profit_associates": ["Share of Profits of Associates"],
+            "share_of_profit_joint_venture": ["Share of Profit from Joint Venture Company", "Attributable Share of Joint Ventures and Joint Ventures"],
             "shares_outstanding": []
         }
 
@@ -243,9 +260,9 @@ class FutuOpenDProvider(BaseProvider):
                 val = float(item.get("data", 0.0))
 
                 # Check tax parameters
-                if display_name in ["税前利润", "Pretax Profit"]:
+                if display_name in ["Pretax Profit"]:
                     pretax_profit = val
-                if display_name in ["所得税", "Tax"]:
+                if display_name in ["Tax"]:
                     tax_expense = val
 
                 # Map matches

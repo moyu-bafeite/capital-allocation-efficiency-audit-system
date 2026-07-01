@@ -20,6 +20,10 @@ def normalize_audit_data(raw_data: Dict[str, Any]) -> Dict[str, Any]:
         "interest_expense",
         "short_term_debt",
         "long_term_debt",
+        "lease_liability_current",
+        "lease_liability_non_current",
+        "convertible_bonds",
+        "notes_payable",
         "cash_and_equivalents",
         "capex",
         "da",
@@ -27,6 +31,9 @@ def normalize_audit_data(raw_data: Dict[str, Any]) -> Dict[str, Any]:
         "buybacks_paid",
         "buybacks_shares",
         "goodwill",
+        "cashflow_impairment_adjustment",
+        "income_impairment_charges",
+        "operating_interest_expense",
     ]
     for field in non_negative_fields:
         if field in financials:
@@ -85,8 +92,17 @@ def normalize_audit_data(raw_data: Dict[str, Any]) -> Dict[str, Any]:
 
     # 4. Fill key net_profit, ebit and optional non-cash adjustment lists
     optional_keys = [
-        "impairment_charges",
-        "fair_value_changes",
+        "lease_liability_current",
+        "lease_liability_non_current",
+        "convertible_bonds",
+        "notes_payable",
+        "cashflow_impairment_adjustment",
+        "cashflow_fair_value_adjustment",
+        "income_impairment_charges",
+        "income_fair_value_changes",
+        "operating_interest_expense",
+        "share_of_profit_associates",
+        "share_of_profit_joint_venture",
         "special_items_of_operating_profit",
         "special_items_of_net_profit",
         "short_term_deposits",

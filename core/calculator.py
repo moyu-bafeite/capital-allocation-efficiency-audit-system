@@ -31,14 +31,45 @@ class FinancialCalculator:
     def _calculate_base_metrics(self):
         """Calculates core financial metrics and stores them as columns in the DataFrame."""
         # 1. NOPAT (Net Operating Profit After Taxes)
+        # Normalize operating profit by removing non-operating / non-cash items
+        # that Futu bundles into "Operating Profit":
+        #   - income_fair_value_changes: revaluation surplus (non-cash, non-operating)
+        #   - income_impairment_charges: impairment charged in operating profit
+        #     (non-cash, one-off); abs-normalized (positive = loss), added back
+        #   - operating_interest_expense: interest deducted above operating profit
+        #     at some issuers (e.g. CK Asset 01113); added back to restore EBIT
+        # Then apply tax, and finally add after-tax share of associates / JV
+        # (these sit below operating profit and are already post-tax).
+        operating_profit_normalized = (
+            self.df["ebit"]
+            - self.df["income_fair_value_changes"]
+            + self.df["income_impairment_charges"]
+            - self.df["special_items_of_operating_profit"]
+            + self.df["operating_interest_expense"]
+        )
         self.df["NOPAT"] = (
-            self.df["ebit"] - self.df["special_items_of_operating_profit"] -
-            self.df["special_items_of_net_profit"]) * (1 - self.df["tax_rate"])
+            operating_profit_normalized * (1 - self.df["tax_rate"])
+            + self.df["share_of_profit_associates"]
+            + self.df["share_of_profit_joint_venture"]
+        )
 
         # 2. Invested Capital (IC)
-        # IC = Equity + Debt - (Cash + Deposits + Short-term & Long-term Cash-like/Financial Assets)
+        # IC = Equity + Debt + Lease Liabilities + Other Interest-Bearing Debt
+        #       - (Cash + Deposits + Short-term & Long-term Cash-like/Financial Assets)
+        # IFRS 16 lease liabilities and other interest-bearing debt (convertible
+        # bonds, notes payable) are added back like traditional debt so that the
+        # RoU / financed assets remain in the capital base.
         total_debt = self.df["short_term_debt"] + self.df["long_term_debt"]
         self.df["total_debt"] = total_debt
+        total_lease_liability = (
+            self.df["lease_liability_current"]
+            + self.df["lease_liability_non_current"]
+        )
+        self.df["total_lease_liability"] = total_lease_liability
+        total_other_interest_bearing_debt = (
+            self.df["convertible_bonds"] + self.df["notes_payable"]
+        )
+        self.df["total_other_interest_bearing_debt"] = total_other_interest_bearing_debt
         total_liquid_cash = (
             self.df["cash_and_equivalents"]
             + self.df["short_term_deposits"]
@@ -53,7 +84,10 @@ class FinancialCalculator:
             + self.df["available_for_sale_financial_assets_current"]
             + self.df["available_for_sale_financial_assets_non_current"]
         )
-        self.df["Invested_Capital"] = self.df["total_equity"] + total_debt - total_liquid_cash
+        self.df["Invested_Capital"] = (
+            self.df["total_equity"] + total_debt + total_lease_liability
+            + total_other_interest_bearing_debt - total_liquid_cash
+        )
 
         # 3. ROIC (Return on Invested Capital)
         # Calculate ROIC based on Average Invested Capital over the current and previous year
@@ -72,14 +106,18 @@ class FinancialCalculator:
         )
 
         # 4. Owner Earnings
-        # Owner Earnings = Net Profit + D&A + Impairments - Fair Value Changes - Maintenance CapEx
+        # Owner Earnings = Net Profit + D&A + Cash-Flow Impairment Add-Back
+        #                  - Cash-Flow Fair-Value Adjustment - Maintenance CapEx
+        # Non-cash adjustments are sourced from the cash flow statement
+        # (cashflow_*), which reflects the add-back section used to reconcile
+        # net profit to operating cash flow.
         maintenance_capex = self.df["capex"] * self.maintenance_capex_ratio
         self.df["maintenance_capex"] = maintenance_capex
         self.df["Owner_Earnings"] = (
             self.df["net_profit"]
             + self.df["da"]
-            + self.df["impairment_charges"]
-            - self.df["fair_value_changes"]
+            + self.df["cashflow_impairment_adjustment"]
+            - self.df["cashflow_fair_value_adjustment"]
             - maintenance_capex
         )
 

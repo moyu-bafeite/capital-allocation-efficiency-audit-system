@@ -12,6 +12,10 @@ class FinancialsSchema(BaseModel):
     total_equity: List[float] = Field(..., description="Total shareholder equity")
     short_term_debt: List[float] = Field(..., description="Short-term interest-bearing debt")
     long_term_debt: List[float] = Field(..., description="Long-term interest-bearing debt")
+    lease_liability_current: Optional[List[float]] = Field(default=None, description="Current portion of lease liabilities (IFRS 16), non-negative")
+    lease_liability_non_current: Optional[List[float]] = Field(default=None, description="Non-current portion of lease liabilities (IFRS 16), non-negative")
+    convertible_bonds: Optional[List[float]] = Field(default=None, description="Convertible notes and bonds (interest-bearing), non-negative")
+    notes_payable: Optional[List[float]] = Field(default=None, description="Notes payable / short-term paper (interest-bearing), non-negative")
     cash_and_equivalents: List[float] = Field(..., description="Cash and equivalents / liquid investments")
     operating_cash_flow: List[float] = Field(..., description="Net cash flow from operating activities")
     capex: List[float] = Field(..., description="Capital expenditures")
@@ -24,8 +28,19 @@ class FinancialsSchema(BaseModel):
     shares_outstanding: List[float] = Field(..., description="Absolute number of outstanding shares (year-end, excl. treasury)")
     avg_stock_price: List[float] = Field(..., description="Average annual stock price, in market_currency per share")
     closing_stock_price: Optional[List[float]] = Field(default=None, description="Closing stock price at the year's last trading day, in market_currency per share. Used for period-end market cap. Falls back to avg_stock_price when absent (e.g. legacy cached data).")
-    impairment_charges: Optional[List[float]] = Field(default=None, description="Goodwill or asset impairment charges (positive for loss)")
-    fair_value_changes: Optional[List[float]] = Field(default=None, description="Fair value changes of investment properties or financial assets (positive for gains, negative for losses)")
+    # Cash-flow-statement non-cash adjustments (used for Owner Earnings). Sourced
+    # from the cash flow statement add-back section; sign convention matches the
+    # cash flow statement (positive = loss added back to net profit).
+    cashflow_impairment_adjustment: Optional[List[float]] = Field(default=None, description="Impairment & provisions add-back from cash flow statement (positive for loss, abs-normalized)")
+    cashflow_fair_value_adjustment: Optional[List[float]] = Field(default=None, description="Fair value / revaluation surplus add-back from cash flow statement (positive = gain, negative = loss)")
+    # Income-statement items used to normalize NOPAT. Sourced from the income
+    # statement (within Operating Profit). Sign: fair value positive = gain;
+    # impairment abs-normalized (positive = loss).
+    income_impairment_charges: Optional[List[float]] = Field(default=None, description="Impairment & provisions charged in operating profit (income statement, positive for loss, abs-normalized)")
+    income_fair_value_changes: Optional[List[float]] = Field(default=None, description="Revaluation surplus / fair value changes included in operating profit (income statement, positive for gain)")
+    operating_interest_expense: Optional[List[float]] = Field(default=None, description="Interest expense deducted above operating profit (e.g. CK Asset), added back to restore EBIT. Non-negative")
+    share_of_profit_associates: Optional[List[float]] = Field(default=None, description="Share of profits of associates (after tax, below operating profit)")
+    share_of_profit_joint_venture: Optional[List[float]] = Field(default=None, description="Share of profit from joint venture companies (after tax, below operating profit)")
     special_items_of_operating_profit: Optional[List[float]] = Field(default=None, description="Special items of operating profit / exceptional operating items")
     special_items_of_net_profit: Optional[List[float]] = Field(default=None, description="Special items of net profit / exceptional non-operating items")
     short_term_deposits: Optional[List[float]] = Field(default=None, description="Short-term deposits")
@@ -57,8 +72,17 @@ class CompanyAuditInput(BaseModel):
         
         # Initialize optional financials lists if they are None to maintain backwards-compatibility
         optional_fields = [
-            "impairment_charges",
-            "fair_value_changes",
+            "lease_liability_current",
+            "lease_liability_non_current",
+            "convertible_bonds",
+            "notes_payable",
+            "cashflow_impairment_adjustment",
+            "cashflow_fair_value_adjustment",
+            "income_impairment_charges",
+            "income_fair_value_changes",
+            "operating_interest_expense",
+            "share_of_profit_associates",
+            "share_of_profit_joint_venture",
             "special_items_of_operating_profit",
             "special_items_of_net_profit",
             "short_term_deposits",
@@ -126,6 +150,10 @@ class CompanyAuditInput(BaseModel):
             "interest_expense",
             "short_term_debt",
             "long_term_debt",
+            "lease_liability_current",
+            "lease_liability_non_current",
+            "convertible_bonds",
+            "notes_payable",
             "cash_and_equivalents",
             "capex",
             "da",
@@ -134,6 +162,9 @@ class CompanyAuditInput(BaseModel):
             "buybacks_shares",
             "ma_paid",
             "goodwill",
+            "cashflow_impairment_adjustment",
+            "income_impairment_charges",
+            "operating_interest_expense",
         ]
         for field_name in non_negative_fields:
             values = getattr(self.financials, field_name)

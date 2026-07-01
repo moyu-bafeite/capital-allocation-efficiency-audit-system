@@ -53,10 +53,17 @@ def _scale_absolute_to_million(result: AuditResult) -> AuditResult:
     fields_to_scale = [
         "net_profit", "ebit", "interest_expense", "total_equity",
         "short_term_debt", "long_term_debt", "cash_and_equivalents",
+        "lease_liability_current", "lease_liability_non_current",
+        "convertible_bonds", "notes_payable",
         "operating_cash_flow", "capex", "da", "dividends_paid",
         "buybacks_paid", "ma_paid", "goodwill",
+        "operating_interest_expense",
+        "share_of_profit_associates", "share_of_profit_joint_venture",
+        "cashflow_impairment_adjustment", "cashflow_fair_value_adjustment",
+        "income_impairment_charges", "income_fair_value_changes",
         "Market_Cap", "Owner_Earnings",
         "maintenance_capex", "total_debt", "Invested_Capital",
+        "total_lease_liability", "total_other_interest_bearing_debt",
         "Retained_Earnings_Annual", "FCF",
     ]
     scaled_df = result.audited_df.copy()

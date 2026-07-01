@@ -30,6 +30,17 @@ class InputSchemaTest(unittest.TestCase):
         self.assertIsNotNone(data.financials.special_items_of_operating_profit)
         self.assertEqual(data.financials.special_items_of_operating_profit, [0.0] * len(data.years))
         self.assertEqual(data.financials.short_term_deposits, [0.0] * len(data.years))
+        self.assertEqual(data.financials.lease_liability_current, [0.0] * len(data.years))
+        self.assertEqual(data.financials.lease_liability_non_current, [0.0] * len(data.years))
+        self.assertEqual(data.financials.convertible_bonds, [0.0] * len(data.years))
+        self.assertEqual(data.financials.notes_payable, [0.0] * len(data.years))
+        self.assertEqual(data.financials.cashflow_impairment_adjustment, [0.0] * len(data.years))
+        self.assertEqual(data.financials.cashflow_fair_value_adjustment, [0.0] * len(data.years))
+        self.assertEqual(data.financials.income_impairment_charges, [0.0] * len(data.years))
+        self.assertEqual(data.financials.income_fair_value_changes, [0.0] * len(data.years))
+        self.assertEqual(data.financials.operating_interest_expense, [0.0] * len(data.years))
+        self.assertEqual(data.financials.share_of_profit_associates, [0.0] * len(data.years))
+        self.assertEqual(data.financials.share_of_profit_joint_venture, [0.0] * len(data.years))
 
 
 if __name__ == "__main__":

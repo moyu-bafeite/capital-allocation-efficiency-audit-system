@@ -175,14 +175,30 @@ class DataLayerTest(unittest.TestCase):
             }
         }
         normalized_a = normalize_audit_data(raw_data_missing)
-        self.assertIn("impairment_charges", normalized_a["financials"])
-        self.assertIn("fair_value_changes", normalized_a["financials"])
+        self.assertIn("cashflow_impairment_adjustment", normalized_a["financials"])
+        self.assertIn("cashflow_fair_value_adjustment", normalized_a["financials"])
+        self.assertIn("income_impairment_charges", normalized_a["financials"])
+        self.assertIn("income_fair_value_changes", normalized_a["financials"])
+        self.assertIn("lease_liability_current", normalized_a["financials"])
+        self.assertIn("lease_liability_non_current", normalized_a["financials"])
+        self.assertIn("convertible_bonds", normalized_a["financials"])
+        self.assertIn("notes_payable", normalized_a["financials"])
+        self.assertIn("operating_interest_expense", normalized_a["financials"])
+        self.assertIn("share_of_profit_associates", normalized_a["financials"])
+        self.assertIn("share_of_profit_joint_venture", normalized_a["financials"])
         self.assertIn("special_items_of_operating_profit", normalized_a["financials"])
-        self.assertEqual(normalized_a["financials"]["impairment_charges"], [0.0, 0.0])
-        self.assertEqual(normalized_a["financials"]["fair_value_changes"], [0.0, 0.0])
+        self.assertEqual(normalized_a["financials"]["cashflow_impairment_adjustment"], [0.0, 0.0])
+        self.assertEqual(normalized_a["financials"]["cashflow_fair_value_adjustment"], [0.0, 0.0])
+        self.assertEqual(normalized_a["financials"]["income_impairment_charges"], [0.0, 0.0])
+        self.assertEqual(normalized_a["financials"]["income_fair_value_changes"], [0.0, 0.0])
+        self.assertEqual(normalized_a["financials"]["lease_liability_current"], [0.0, 0.0])
+        self.assertEqual(normalized_a["financials"]["lease_liability_non_current"], [0.0, 0.0])
         self.assertEqual(normalized_a["financials"]["special_items_of_operating_profit"], [0.0, 0.0])
 
-        # Case B: Fields have None or negative values
+        # Case B: Fields have None or negative values.
+        # cashflow_impairment_adjustment and income_impairment_charges are
+        # abs-normalized (non-negative). cashflow_fair_value_adjustment and
+        # income_fair_value_changes preserve sign (positive = gain).
         raw_data_with_values = {
             "years": [2020, 2021],
             "currency": "USD",
@@ -191,14 +207,25 @@ class DataLayerTest(unittest.TestCase):
             "exchange_rate_to_reporting_currency": [1.0, 1.0],
             "financials": {
                 "net_profit": [100.0, 120.0],
-                "impairment_charges": [15.0, None],
-                "fair_value_changes": [-10.0, 50.0], # negative values are preserved (losses)
+                "cashflow_impairment_adjustment": [-15.0, None],
+                "cashflow_fair_value_adjustment": [-10.0, 50.0],
+                "income_impairment_charges": [-20.0, None],
+                "income_fair_value_changes": [30.0, -5.0],
+                "lease_liability_current": [-12.0, None],
+                "lease_liability_non_current": [40.0, 0.0],
                 "special_items_of_operating_profit": [5.0, None],
             }
         }
         normalized_b = normalize_audit_data(raw_data_with_values)
-        self.assertEqual(normalized_b["financials"]["impairment_charges"], [15.0, 0.0])
-        self.assertEqual(normalized_b["financials"]["fair_value_changes"], [-10.0, 50.0])
+        # abs-normalized impairment fields
+        self.assertEqual(normalized_b["financials"]["cashflow_impairment_adjustment"], [15.0, 0.0])
+        self.assertEqual(normalized_b["financials"]["income_impairment_charges"], [20.0, 0.0])
+        # sign-preserved fair value fields
+        self.assertEqual(normalized_b["financials"]["cashflow_fair_value_adjustment"], [-10.0, 50.0])
+        self.assertEqual(normalized_b["financials"]["income_fair_value_changes"], [30.0, -5.0])
+        # abs-normalized liability fields
+        self.assertEqual(normalized_b["financials"]["lease_liability_current"], [12.0, 0.0])
+        self.assertEqual(normalized_b["financials"]["lease_liability_non_current"], [40.0, 0.0])
         self.assertEqual(normalized_b["financials"]["special_items_of_operating_profit"], [5.0, 0.0])
 
     def test_data_manager_restores_from_cache_successfully(self):
