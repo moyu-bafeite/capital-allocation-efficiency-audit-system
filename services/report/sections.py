@@ -120,7 +120,7 @@ def build_capital_allocation_section(
     total_ocf = waterfall_data["Total_Operating_Cash_Flow"]
 
     wf_fig = create_waterfall_chart(waterfall_data, start_year, end_year)
-    pie_fig = create_allocation_pie_chart(waterfall_data)
+    pie_fig = create_allocation_pie_chart(waterfall_data, data.currency)
 
     charts = [
         {"fig": wf_fig, "height": 480, "alt": "Capital allocation waterfall", "caption": None},

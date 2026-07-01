@@ -74,7 +74,7 @@ def create_waterfall_chart(waterfall_data: dict, start_year: int, end_year: int)
     return fig
 
 
-def create_allocation_pie_chart(waterfall_data: dict) -> go.Figure:
+def create_allocation_pie_chart(waterfall_data: dict, currency: str) -> go.Figure:
     fig = px.pie(
         names=[
             t("chart.pie.label.capex"),
@@ -84,16 +84,19 @@ def create_allocation_pie_chart(waterfall_data: dict) -> go.Figure:
             t("chart.pie.label.other"),
         ],
         values=[
-            waterfall_data["CapEx"],
-            waterfall_data["Dividends"],
-            waterfall_data["Buybacks"],
-            waterfall_data["M_and_A"],
-            max(0, waterfall_data["Other_Retention"]),
+            waterfall_data["CapEx"] * 1e6,
+            waterfall_data["Dividends"] * 1e6,
+            waterfall_data["Buybacks"] * 1e6,
+            waterfall_data["M_and_A"] * 1e6,
+            max(0, waterfall_data["Other_Retention"]) * 1e6,
         ],
         hole=0.4,
         color_discrete_sequence=["#10B981", "#3B82F6", "#EC4899", "#F59E0B", "#6B7280"],
     )
-    fig.update_traces(marker=dict(line=dict(color="rgba(128, 128, 128, 1.0)", width=1.0)))
+    fig.update_traces(
+        marker=dict(line=dict(color="rgba(128, 128, 128, 1.0)", width=1.0)),
+        hovertemplate=f"%{{label}}<br>{currency} %{{value:,.0f}}<extra></extra>",
+    )
     fig.update_layout(
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",

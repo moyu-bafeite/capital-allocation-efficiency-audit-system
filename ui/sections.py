@@ -125,7 +125,7 @@ def render_capital_allocation_section(data: CompanyAuditInput, result: AuditResu
     waterfall_data = result.calculator.get_waterfall_data(start_year_selected, end_year_selected)
     st.plotly_chart(create_waterfall_chart(waterfall_data, start_year_selected, end_year_selected), use_container_width=True)
     st.markdown(f"###### {t('section.capital.composition_rate')}")
-    st.plotly_chart(create_allocation_pie_chart(waterfall_data), use_container_width=True)
+    st.plotly_chart(create_allocation_pie_chart(waterfall_data, data.currency), use_container_width=True)
 
     st.markdown(f"###### {t('section.capital.diagnostics')}")
     c1, c2, c3, c4 = st.columns(4)

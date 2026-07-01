@@ -123,6 +123,7 @@ class DataLayerTest(unittest.TestCase):
                 "ebit": [120000000.0, 140000000.0],
                 "tax_rate": [0.18234567, 0.20987654],
                 "avg_stock_price": [12.3456789, 15.9876543],
+                "closing_stock_price": [13.1111111, 16.2222222],
                 "buybacks_paid": [1234567.891234567, 9876543.219999999],
                 "buybacks_shares": [100000.0, 200000.0],
             },
@@ -131,7 +132,8 @@ class DataLayerTest(unittest.TestCase):
         self.assertEqual(normalized["exchange_rate_to_reporting_currency"], [0.8765, 0.9123])
         self.assertEqual(normalized["closing_exchange_rate_to_reporting_currency"], [0.8811, 0.91])
         self.assertEqual(normalized["financials"]["tax_rate"], [0.1823, 0.2099])
-        self.assertEqual(normalized["financials"]["avg_stock_price"], [12.3457, 15.9877])
+        self.assertEqual(normalized["financials"]["avg_stock_price"], [12.346, 15.988])
+        self.assertEqual(normalized["financials"]["closing_stock_price"], [13.111, 16.222])
         self.assertEqual(normalized["financials"]["buybacks_paid"], [1234568.0, 9876543.0])
 
     def test_normalizer_rounds_display_fields_million_mode(self):
@@ -147,6 +149,7 @@ class DataLayerTest(unittest.TestCase):
                 "ebit": [120.0, 140.0],
                 "tax_rate": [0.18234567, 0.20987654],
                 "avg_stock_price": [12.3456789, 15.9876543],
+                "closing_stock_price": [13.1111111, 16.2222222],
                 "buybacks_paid": [12.3456789, 9.8765432],
                 "buybacks_shares": [100000.0, 200000.0],
             },
@@ -155,7 +158,8 @@ class DataLayerTest(unittest.TestCase):
         self.assertEqual(normalized["exchange_rate_to_reporting_currency"], [0.8765, 0.9123])
         self.assertEqual(normalized["closing_exchange_rate_to_reporting_currency"], [0.8811, 0.91])
         self.assertEqual(normalized["financials"]["tax_rate"], [0.1823, 0.2099])
-        self.assertEqual(normalized["financials"]["avg_stock_price"], [12.3457, 15.9877])
+        self.assertEqual(normalized["financials"]["avg_stock_price"], [12.346, 15.988])
+        self.assertEqual(normalized["financials"]["closing_stock_price"], [13.111, 16.222])
         self.assertEqual(normalized["financials"]["buybacks_paid"], [12.345679, 9.876543])
 
     def test_normalizer_handles_optional_non_cash_adjustment_fields(self):

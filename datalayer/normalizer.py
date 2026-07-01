@@ -150,7 +150,9 @@ def normalize_audit_data(raw_data: Dict[str, Any]) -> Dict[str, Any]:
     if "tax_rate" in financials:
         financials["tax_rate"] = [round(float(v), 4) for v in financials["tax_rate"]]
     if "avg_stock_price" in financials:
-        financials["avg_stock_price"] = [round(float(v), 2) for v in financials["avg_stock_price"]]
+        financials["avg_stock_price"] = [round(float(v), 3) for v in financials["avg_stock_price"]]
+    if "closing_stock_price" in financials and financials["closing_stock_price"] is not None:
+        financials["closing_stock_price"] = [round(float(v), 3) for v in financials["closing_stock_price"]]
     paid_decimals = 0 if amount_unit == "absolute" else 6
     if "buybacks_paid" in financials:
         financials["buybacks_paid"] = [round(float(v), paid_decimals) for v in financials["buybacks_paid"]]
